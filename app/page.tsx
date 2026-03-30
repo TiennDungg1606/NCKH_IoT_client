@@ -52,23 +52,24 @@ export default function Dashboard() {
   }, [socket]);
 
   const toggleDevice = useCallback((id: string, currentState: boolean) => {
+    const REAL_MAC_ADDRESS = "D4:E9:F4:E9:53:DC"; // Thay địa chỉ MAC thực tế của ESP32 vào đây
+    
     if (id === 'light') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, light: newState }));
-      sendDeviceCommand('ESP32_MAC_ADDRESS', newState ? 'L1_ON' : 'L1_OFF');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'L1_ON' : 'L1_OFF');
     } else if (id === 'door') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, door: newState }));
-      // Example commands
-      sendDeviceCommand('ESP32_MAC_ADDRESS', newState ? 'DOOR_OPEN' : 'DOOR_CLOSE');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'DOOR_OPEN' : 'DOOR_CLOSE');
     } else if (id === 'auxLight') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, auxLight: newState }));
-      sendDeviceCommand('ESP32_MAC_ADDRESS', newState ? 'L2_ON' : 'L2_OFF');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'L2_ON' : 'L2_OFF');
     } else if (id === 'fan') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, fan: newState }));
-      sendDeviceCommand('ESP32_MAC_ADDRESS', newState ? 'FAN_ON' : 'FAN_OFF');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'FAN_ON' : 'FAN_OFF');
     }
   }, [sendDeviceCommand, socket]);
 
