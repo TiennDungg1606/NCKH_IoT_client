@@ -61,7 +61,7 @@ export default function Dashboard() {
     } else if (id === 'door') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, door: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'DOOR_OPEN' : 'DOOR_CLOSE');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'M1_OPEN' : 'M1_CLOSE');
     } else if (id === 'auxLight') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, auxLight: newState }));
@@ -69,7 +69,7 @@ export default function Dashboard() {
     } else if (id === 'fan') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, fan: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'FAN_ON' : 'FAN_OFF');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'M2_ON' : 'M2_OFF');
     }
   }, [sendDeviceCommand, socket]);
 
