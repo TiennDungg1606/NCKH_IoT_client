@@ -61,7 +61,7 @@ export default function Dashboard() {
     } else if (id === 'door') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, door: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'M1_OPEN' : 'M1_CLOSE');
+      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'M1_OPEN' : 'M1_OFF');
     } else if (id === 'auxLight') {
       const newState = !currentState;
       setDevices(prev => ({ ...prev, auxLight: newState }));
