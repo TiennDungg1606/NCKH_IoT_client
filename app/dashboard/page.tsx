@@ -140,7 +140,7 @@ export default function Dashboard() {
 
     setTimeout(() => {
       setFeedbackText("🎙️ Nhấn micro và nói lệnh (bật/tắt đèn...)");
-    }, 4000);
+    }, 7000);
   };
 
   const handleLogout = () => {
