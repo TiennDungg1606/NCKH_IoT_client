@@ -81,7 +81,8 @@ export default function Dashboard() {
       if (!devices.light) toggleDevice('light', false);
       if (!devices.auxLight) toggleDevice('auxLight', false);
       if (!devices.fan) toggleDevice('fan', false);
-      response = "Đã bật tất cả thiết bị (trừ cửa)";
+      if (!devices.door) toggleDevice('door', false);
+      response = "Đã bật tất cả thiết bị";
     } else if (cmd.includes("tắt tất cả")) {
       if (devices.light) toggleDevice('light', true);
       if (devices.auxLight) toggleDevice('auxLight', true);
