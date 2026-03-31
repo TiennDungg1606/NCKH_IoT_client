@@ -20,11 +20,15 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
         rec.lang = 'vi-VN';
         rec.interimResults = false;
         rec.maxAlternatives = 1;
+        // Mẹo lọc tạp âm (Trên Chrome/Android, continous = false giúp ngắt nhanh khi câu nói vừa dứt chữ)
+        rec.continuous = false;
 
         rec.onstart = () => setIsListening(true);
         rec.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           onResultRef.current(transcript);
+          // Ngay khi có kết quả, dừng luôn việc nghe
+          rec.stop();
           setIsListening(false);
           clearAutoStopRef();
         };
@@ -68,9 +72,8 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
           if (recognition) {
             recognition.stop();
           }
-          setError("Tự động ngắt (Không có giọng nói)");
           setIsListening(false);
-        }, 2000);
+        }, 8000); // 8 giây thay vì 2 giây
 
       } catch (e) {
         // Tránh vòng lặp vô tận, chỉ dừng nếu có lỗi chứ không cố gắng khởi động lại liên tục
