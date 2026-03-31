@@ -16,24 +16,24 @@ const handler = NextAuth({
         await dbConnect();
 
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Missing email or password");
+          throw new Error("Vui lòng nhập đầy đủ Email và Mật khẩu");
         }
 
         const user = await User.findOne({ email: credentials.email });
 
         if (!user || !user.password) {
-          throw new Error("No user found");
+          throw new Error("Tài khoản không tồn tại");
         }
 
         const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
 
         if (!isPasswordValid) {
-          throw new Error("Invalid password");
+          throw new Error("Mật khẩu không chính xác");
         }
 
         return {
           id: user._id.toString(),
-          name: user.name,
+          name: user.userName, // Sửa từ name -> userName cho đúng Schema
           email: user.email,
         };
       }
@@ -46,12 +46,16 @@ const handler = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
         (session.user as any).id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
       }
       return session;
     }

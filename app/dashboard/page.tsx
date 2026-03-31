@@ -4,14 +4,21 @@ import { useEffect, useState, useCallback } from "react";
 import io, { Socket } from "socket.io-client";
 import DeviceCard from "@/components/DeviceCard";
 import VoiceControl from "@/components/VoiceControl";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, UserRound, Settings, LogOut } from "lucide-react";
+import Cookies from "js-cookie";
+import { useRouter } from "next/navigation";
 // Assuming you have NextAuth session, we'd normally get devices from DB
 // For this demo, we'll manage local state mapped to DB devices eventually
 
 export default function Dashboard() {
+  const router = useRouter();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [feedbackText, setFeedbackText] = useState("🎙️ Nhấn micro và nói lệnh (bật/tắt đèn...)");
+  
+  // User state từ Cookie
+  const [userName, setUserName] = useState("Người dùng");
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   
   // Dummy device states matching HTML
   const [devices, setDevices] = useState({
@@ -22,6 +29,14 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
+    // Lấy thông tin user từ cookie khi load trang
+    const savedUserName = Cookies.get("userName");
+    if (savedUserName) {
+      setUserName(savedUserName);
+    } else {
+      // Nếu không có, bắt buộc phải đăng nhập lại (Có thể thêm login redirect ở đây)
+    }
+
     // Connect to Node.js backend
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
     const newSocket = io(socketUrl, {
@@ -125,7 +140,17 @@ export default function Dashboard() {
 
     setTimeout(() => {
       setFeedbackText("🎙️ Nhấn micro và nói lệnh (bật/tắt đèn...)");
-    }, 3000);
+    }, 4000);
+  };
+
+  const handleLogout = () => {
+    // Xóa tất cả dấu vết của user khỏi cookie
+    Cookies.remove("userId");
+    Cookies.remove("userName");
+    Cookies.remove("userEmail");
+    
+    // Đẩy văng về trang chủ
+    router.push("/");
   };
 
   return (
@@ -139,12 +164,46 @@ export default function Dashboard() {
         <div className="flex justify-between items-center sm:mt-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Ngôi Nhà</h1>
-              <p className="text-zinc-400 text-sm mt-1">Xin chào, Quản trị viên</p>
+              <p className="text-zinc-400 text-sm mt-1">Xin chào, {userName}</p>
             </div>
             
-            <div className="flex items-center gap-3 bg-zinc-800/40 rounded-full pl-3 pr-4 py-2 border border-white/5 backdrop-blur-md text-sm">
-                <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#34d399]" : "bg-red-500 shadow-[0_0_10px_#ef4444]"}`}></div>
-                <span className="font-medium">{isConnected ? "Connected" : "Offline"}</span>
+            <div className="flex items-center gap-4 relative">
+              <div className="flex items-center gap-3 bg-zinc-800/40 rounded-full pl-3 pr-4 py-2 border border-white/5 backdrop-blur-md text-sm">
+                  <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#34d399]" : "bg-red-500 shadow-[0_0_10px_#ef4444]"}`}></div>
+                  <span className="font-medium">{isConnected ? "Connected" : "Offline"}</span>
+              </div>
+              
+              {/* User Avatar Menu */}
+              <div className="relative">
+                <button 
+                  onClick={() => setIsAvatarMenuOpen(!isAvatarMenuOpen)}
+                  className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-white/10 flex items-center justify-center hover:border-blue-500/50 transition-colors focus:outline-none"
+                >
+                  <UserRound className="w-5 h-5 text-zinc-300" />
+                </button>
+                
+                {/* Fallback Menu Dropdown */}
+                {isAvatarMenuOpen && (
+                  <div className="absolute right-0 mt-3 w-48 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                    <button className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors">
+                      <UserRound className="w-4 h-4" />
+                      Hồ sơ của tôi
+                    </button>
+                    <button className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors">
+                      <Settings className="w-4 h-4" />
+                      Cài đặt
+                    </button>
+                    <div className="w-full h-px bg-white/5 my-1"></div>
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors group"
+                    >
+                      <LogOut className="w-4 h-4 group-hover:pl-0.5 transition-all" />
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
         </div>
 
@@ -178,7 +237,7 @@ export default function Dashboard() {
                      <span className="text-sm font-semibold text-zinc-100">Gợi ý lệnh</span>
                  </div>
                  <div className="text-sm leading-relaxed text-zinc-400">
-                     "bật/tắt đèn", "mở/đóng cửa", "bật/tắt đèn phụ", "bật/tắt quạt"
+                     "bật/tắt đèn", "mở/đóng cửa", "bật/tắt đèn phụ", "bật/tắt quạt", "bật/tắt tất cả"
                  </div>
              </div>
           </div>
