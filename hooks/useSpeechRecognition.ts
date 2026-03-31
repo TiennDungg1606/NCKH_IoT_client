@@ -6,6 +6,7 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
   const [error, setError] = useState<string | null>(null);
   
   const onResultRef = useRef(onResult);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -25,6 +26,7 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
           const transcript = event.results[0][0].transcript;
           onResultRef.current(transcript);
           setIsListening(false);
+          clearAutoStopRef();
         };
         rec.onerror = (event: any) => {
           let errMsg = "Lỗi nhận diện, thử lại";
@@ -33,8 +35,12 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
           
           setError(errMsg);
           setIsListening(false);
+          clearAutoStopRef();
         };
-        rec.onend = () => setIsListening(false);
+        rec.onend = () => {
+          setIsListening(false);
+          clearAutoStopRef();
+        };
 
         setRecognition(rec);
       } else {
@@ -43,15 +49,34 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
     }
   }, []);
 
+  const clearAutoStopRef = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
   const startListening = useCallback(() => {
     if (recognition) {
       try {
         setError(null);
+        clearAutoStopRef();
         recognition.start();
+
+        // Tự động ngắt mic sau 8 giây nếu không có tín hiệu (Dành cho Mobile / trình duyệt không tự ngắt)
+        timeoutRef.current = setTimeout(() => {
+          if (recognition) {
+            recognition.stop();
+          }
+          setError("Tự động ngắt (Không có giọng nói)");
+          setIsListening(false);
+        }, 8000);
+
       } catch (e) {
         // Tránh vòng lặp vô tận, chỉ dừng nếu có lỗi chứ không cố gắng khởi động lại liên tục
         recognition.stop();
         setIsListening(false);
+        clearAutoStopRef();
       }
     }
   }, [recognition]);
@@ -60,6 +85,8 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
     if (recognition && isListening) {
       recognition.stop();
     }
+    clearAutoStopRef();
+    setIsListening(false);
   }, [recognition, isListening]);
 
   return { isListening, error, startListening, stopListening, hasSupport: !!recognition };

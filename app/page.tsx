@@ -77,7 +77,18 @@ export default function Dashboard() {
     const cmd = transcript.toLowerCase().trim();
     let response = "";
 
-    if (cmd.includes("bật đèn phụ") || cmd.includes("mở đèn phụ")) {
+    if (cmd.includes("bật tất cả") || cmd.includes("mở tất cả")) {
+      if (!devices.light) toggleDevice('light', false);
+      if (!devices.auxLight) toggleDevice('auxLight', false);
+      if (!devices.fan) toggleDevice('fan', false);
+      response = "Đã bật tất cả thiết bị (trừ cửa)";
+    } else if (cmd.includes("tắt tất cả")) {
+      if (devices.light) toggleDevice('light', true);
+      if (devices.auxLight) toggleDevice('auxLight', true);
+      if (devices.fan) toggleDevice('fan', true);
+      if (devices.door) toggleDevice('door', true); // Maybe close door too when turning off all
+      response = "Đã tắt tất cả thiết bị";
+    } else if (cmd.includes("bật đèn phụ") || cmd.includes("mở đèn phụ")) {
       if (!devices.auxLight) toggleDevice('auxLight', false);
       else response = "Đèn phụ đã bật sẵn rồi";
     } else if (cmd.includes("tắt đèn phụ")) {
