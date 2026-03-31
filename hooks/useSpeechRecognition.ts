@@ -70,7 +70,7 @@ export const useSpeechRecognition = (onResult: (transcript: string) => void) => 
           }
           setError("Tự động ngắt (Không có giọng nói)");
           setIsListening(false);
-        }, 8000);
+        }, 2000);
 
       } catch (e) {
         // Tránh vòng lặp vô tận, chỉ dừng nếu có lỗi chứ không cố gắng khởi động lại liên tục
