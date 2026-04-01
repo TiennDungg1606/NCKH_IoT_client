@@ -27,7 +27,7 @@ export default function VoiceControl({ onCommand, statusText }: VoiceControlProp
   }
 
   return (
-    <div className="bg-zinc-800/40 backdrop-blur-xl rounded-3xl p-8 border border-white/5 flex flex-col items-center justify-center min-h-[300px]">
+    <div className="bg-zinc-800/40 backdrop-blur-xl rounded-3xl p-1 border border-white/5 flex flex-col items-center justify-center min-h-[300px]">
         <div className="text-center mb-8">
             <h3 className="text-lg font-semibold text-zinc-100 mb-1">Trợ lý giọng nói</h3>
             <p className="text-sm font-medium text-zinc-400 h-6">

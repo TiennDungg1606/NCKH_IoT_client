@@ -175,7 +175,7 @@ export default function RegisterPage() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Đăng ký ngay</span>
+                  <span>Đăng ký</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

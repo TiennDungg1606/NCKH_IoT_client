@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { User, Lock, ArrowRight, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +14,13 @@ export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Nếu cookie còn tồn tại, tức là đang đăng nhập hợp lệ => Chuyển thẳng tới dashboard
+    if (Cookies.get("userName")) {
+      router.replace('/dashboard');
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +136,7 @@ export default function LandingPage() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Truy cập hệ thống</span>
+                  <span>Đăng nhập</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

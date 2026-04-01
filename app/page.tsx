@@ -1,7 +1,22 @@
+"use client";
 import Link from "next/link";
 import { ArrowRight, Home, ShieldCheck, Zap, Mic } from "lucide-react";
+import Cookies from "js-cookie";
+
+
+import { useEffect, useState } from "react";
 
 export default function LandingPage() {
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Kiểm tra xem đã đăng nhập chưa
+    const savedUserName = Cookies.get("userName");
+    if (savedUserName) {
+      setUserName(savedUserName);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#070709] text-zinc-100 font-sans selection:bg-blue-500/30">
       {/* Background gradients */}
@@ -24,18 +39,29 @@ export default function LandingPage() {
 
         {/* Auth Buttons Top Right */}
         <div className="flex items-center gap-4">
-          <Link 
-            href="/login" 
-            className="text-sm font-medium text-zinc-300 hover:text-white transition-colors"
-          >
-            Đăng nhập
-          </Link>
-          <Link 
-            href="/register" 
-            className="text-sm font-medium bg-white/10 hover:bg-white/15 border border-white/10 text-white px-5 py-2.5 rounded-full transition-all"
-          >
-            Đăng ký
-          </Link>
+          {userName ? (
+            <Link 
+              href="/dashboard" 
+              className="text-sm font-medium bg-blue-600 hover:bg-blue-500 border border-transparent text-white px-5 py-2.5 rounded-full transition-all flex items-center gap-2"
+            >
+              <span>Vào Dashboard</span>
+            </Link>
+          ) : (
+            <>
+              <Link 
+                href="/login" 
+                className="text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+              >
+                Đăng nhập
+              </Link>
+              <Link 
+                href="/register" 
+                className="text-sm font-medium bg-white/10 hover:bg-white/15 border border-white/10 text-white px-5 py-2.5 rounded-full transition-all"
+              >
+                Đăng ký
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -49,15 +75,6 @@ export default function LandingPage() {
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-zinc-200 to-zinc-600 max-w-4xl leading-tight">
           Sáng tạo không gian sống, điều khiển bằng giọng nói.
         </h1>
-
-        <div className="mt-12 flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
-          <Link 
-            href="/dashboard" 
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-800/80 hover:bg-zinc-700/80 border border-white/5 text-zinc-300 px-8 py-4 rounded-full font-medium transition-all"
-          >
-            <span>Xem Dashboard Demo</span>
-          </Link>
-        </div>
 
         {/* Feature Highlights List */}
         <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
