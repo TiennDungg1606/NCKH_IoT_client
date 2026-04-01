@@ -283,9 +283,9 @@ export default function Dashboard() {
           </div>
 
           {/* Sidebar - Right Column (4 cols) */}
-          <div className={`lg:col-span-4 ${mobileShrink1 ? 'space-y-4' : 'space-y-6'}`}>
-             <div className={mobileShrink1 ? 'scale-[0.9] origin-top' : ''}>
-               <VoiceControl onCommand={handleVoiceCommand} statusText={feedbackText} />
+          <div className={`lg:col-span-4 space-y-6`}>
+             <div>
+               <VoiceControl onCommand={handleVoiceCommand} statusText={feedbackText} mobileShrink1={mobileShrink1} />
              </div>
 
              {/* AI Tips */}

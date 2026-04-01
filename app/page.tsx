@@ -9,6 +9,40 @@ import { useEffect, useState } from "react";
 export default function LandingPage() {
   const [userName, setUserName] = useState<string | null>(null);
 
+  // Responsive states for mobile/desktop layout adjustments  
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+  const [isMobileLandscape, setIsMobileLandscape] = useState(false);
+  const [isCompactWidth, setIsCompactWidth] = useState(false);
+  const [mobileShrink, setMobileShrink] = useState(false);
+
+  useEffect(() => {
+    function checkDevice() {
+      const mobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+      const viewportWidth = window.innerWidth;
+      const enableMobileLayout = mobile && viewportWidth >= 768;
+      setIsMobileDevice(mobile);
+      setIsMobile(enableMobileLayout);
+      const portrait = window.innerHeight > window.innerWidth;
+      setIsPortrait(mobile ? portrait : false);
+      setMobileShrink(false);
+      setIsMobileLandscape(mobile && !portrait);
+    }
+    if (typeof window !== 'undefined') {
+      checkDevice();
+      window.addEventListener('resize', checkDevice);
+      window.addEventListener('orientationchange', checkDevice);
+      return () => {
+        window.removeEventListener('resize', checkDevice);
+        window.removeEventListener('orientationchange', checkDevice);
+      };
+    }
+  }, []);
+
+  const mobileShrink1 = isPortrait || isCompactWidth;
+
+
   useEffect(() => {
     // Kiểm tra xem đã đăng nhập chưa
     const savedUserName = Cookies.get("userName");
@@ -25,7 +59,7 @@ export default function LandingPage() {
       <div className="fixed top-[40%] left-[20%] w-[20%] h-[20%] bg-purple-600/10 blur-[90px] rounded-full pointer-events-none" />
 
       {/* Header / Navbar */}
-      <header className="relative z-50 px-6 py-6 max-w-7xl mx-auto flex items-center justify-between">
+      <header className={`relative ${mobileShrink1 ? 'z-50 px-3 py-3' : 'z-50 px-6 py-6'} mx-auto flex items-center justify-between`}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-zinc-800/80 rounded-xl flex items-center justify-center border border-white/5 shadow-lg">
             <Home className="w-5 h-5 text-blue-400" />
@@ -66,49 +100,55 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 pt-5 pb-10 flex flex-col items-center justify-center text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium mb-8 p-1">
+      <main className={`relative z-10 max-w-7xl mx-auto ${mobileShrink1 ? 'px-4 pt-1 pb-4' : 'px-6 pt-2 pb-5'} flex flex-col items-center justify-center text-center`}>
+        <div className={`inline-flex items-center gap-2 ${mobileShrink1 ? 'px-2 py-1 mb-4' : 'px-3 py-1.5 mb-3'} rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium p-1`}>
           <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
           Thế hệ nhà thông minh mới
         </div>
         
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-zinc-200 to-zinc-600 max-w-4xl leading-tight">
+        <h1 className={`${mobileShrink1 ? 'text-4xl px-1' : 'text-5xl md:text-7xl'} font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-zinc-200 to-zinc-600 max-w-4xl leading-tight`}>
           Sáng tạo không gian sống, điều khiển bằng giọng nói.
         </h1>
 
         {/* Feature Highlights List */}
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
-          <div className="p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4">
-              <Zap className="w-6 h-6 text-blue-400" />
+        <div className={`${mobileShrink1 ? 'mt-6 gap-3 flex flex-wrap justify-center px-4' : 'mt-10 gap-8 grid grid-cols-3'} w-full max-w-5xl`}>
+          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-3 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
+            <div className={`${mobileShrink1 ? 'w-10 h-10 mb-2' : 'w-12 h-12 mb-4'} rounded-2xl bg-blue-500/10 flex items-center justify-center`}>
+              <Zap className={`${mobileShrink1 ? 'w-5 h-5' : 'w-6 h-6'} text-blue-400`} />
             </div>
-            <h3 className="text-lg font-semibold text-zinc-200 mb-2">Độ trễ mili-giây</h3>
-            <p className="text-zinc-500 text-sm leading-relaxed">Kết nối trực tiếp thiết bị qua Socket.io siêu nhẹ, phản hồi lệnh ngay lập tức.</p>
+            <div>
+              <h3 className={`${mobileShrink1 ? 'text-[14px] leading-tight mb-1' : 'text-lg mb-2'} font-semibold text-zinc-200`}>Độ trễ thấp</h3>
+              <p className={`${mobileShrink1 ? 'text-[11px] leading-snug px-1 line-clamp-3' : 'text-sm'} text-zinc-500 leading-relaxed`}>Kết nối trực tiếp thiết bị qua Socket.io siêu nhẹ, phản hồi lệnh ngay lập tức.</p>
+            </div>
           </div>
           
-          <div className="p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mb-4">
-              <Mic className="w-6 h-6 text-purple-400" />
+          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-3 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
+            <div className={`${mobileShrink1 ? 'w-10 h-10 mb-2' : 'w-12 h-12 mb-4'} rounded-2xl bg-purple-500/10 flex items-center justify-center`}>
+              <Mic className={`${mobileShrink1 ? 'w-5 h-5' : 'w-6 h-6'} text-purple-400`} />
             </div>
-            <h3 className="text-lg font-semibold text-zinc-200 mb-2">Điều khiển Giọng nói</h3>
-            <p className="text-zinc-500 text-sm leading-relaxed">Tích hợp Web Speech API, hỗ trợ tiếng Việt mượt mà rảnh tay hoàn toàn.</p>
+            <div>
+              <h3 className={`${mobileShrink1 ? 'text-[14px] leading-tight mb-1' : 'text-lg mb-2'} font-semibold text-zinc-200`}>Giọng nói</h3>
+              <p className={`${mobileShrink1 ? 'text-[11px] leading-snug px-1 line-clamp-3' : 'text-sm'} text-zinc-500 leading-relaxed`}>Tích hợp Web Speech API, hỗ trợ tiếng Việt mượt mà rảnh tay hoàn toàn.</p>
+            </div>
           </div>
 
-          <div className="p-6 rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4">
-              <ShieldCheck className="w-6 h-6 text-emerald-400" />
+          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-3 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
+            <div className={`${mobileShrink1 ? 'w-10 h-10 mb-2' : 'w-12 h-12 mb-4'} rounded-2xl bg-emerald-500/10 flex items-center justify-center`}>
+              <ShieldCheck className={`${mobileShrink1 ? 'w-5 h-5' : 'w-6 h-6'} text-emerald-400`} />
             </div>
-            <h3 className="text-lg font-semibold text-zinc-200 mb-2">Bảo mật vượt trội</h3>
-            <p className="text-zinc-500 text-sm leading-relaxed">Cơ chế quản lý đăng nhập an toàn, phân quyền rõ ràng qua NextAuth.</p>
+            <div>
+              <h3 className={`${mobileShrink1 ? 'text-[14px] leading-tight mb-1' : 'text-lg mb-2'} font-semibold text-zinc-200`}>Bảo mật</h3>
+              <p className={`${mobileShrink1 ? 'text-[11px] leading-snug px-1 line-clamp-3' : 'text-sm'} text-zinc-500 leading-relaxed`}>Cơ chế quản lý đăng nhập an toàn, phân quyền rõ ràng qua NextAuth.</p>
+            </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 bg-black/20 mt-10">
-        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col items-center justify-between gap-4">
+      <footer className="relative z-10 border-t border-white/5 bg-black/20 mt-5 mb-3">
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-between gap-4">
           <div className="text-zinc-500 text-sm">
-            &copy; 2026 Nghiên cứu Khoa học Smart Home Team. All rights reserved.
+            &copy; 2026 NCKH Smart Home Team.
           </div>
         </div>
       </footer>

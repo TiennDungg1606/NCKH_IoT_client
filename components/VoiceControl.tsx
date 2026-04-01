@@ -2,13 +2,15 @@
 
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { Mic, MicOff } from "lucide-react";
+import DeviceCard from "./DeviceCard";
 
 interface VoiceControlProps {
   onCommand: (command: string) => void;
   statusText: string;
+  mobileShrink1?: boolean;
 }
 
-export default function VoiceControl({ onCommand, statusText }: VoiceControlProps) {
+export default function VoiceControl({ onCommand, statusText, mobileShrink1 }: VoiceControlProps) {
   const { isListening, error, startListening, stopListening, hasSupport } = useSpeechRecognition((transcript) => {
     onCommand(transcript);
   });
@@ -27,8 +29,8 @@ export default function VoiceControl({ onCommand, statusText }: VoiceControlProp
   }
 
   return (
-    <div className="bg-zinc-800/40 backdrop-blur-xl rounded-3xl p-1 border border-white/5 flex flex-col items-center justify-center min-h-[300px]">
-        <div className="text-center mb-8">
+    <div className={`${mobileShrink1 ? 'p-4' : 'p-3'} bg-zinc-800/40 backdrop-blur-xl rounded-3xl p-1 border border-white/5 flex flex-col items-center justify-center`}>
+        <div className="text-center mb-3">
             <h3 className="text-lg font-semibold text-zinc-100 mb-1">Trợ lý giọng nói</h3>
             <p className="text-sm font-medium text-zinc-400 h-6">
                 {error ? <span className="text-red-400">⚠️ {error}</span> : isListening ? "Đang lắng nghe..." : "Nhấn để ra lệnh"}
@@ -52,7 +54,7 @@ export default function VoiceControl({ onCommand, statusText }: VoiceControlProp
           )}
         </button>
         
-        <div className="mt-8 text-center max-w-[220px]">
+        <div className="mt-3 text-center max-w-[220px]">
             <p className="text-xs text-zinc-500 leading-relaxed font-medium min-h-[40px]">
                 {statusText}
             </p>
