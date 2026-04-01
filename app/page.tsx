@@ -72,11 +72,11 @@ export default function LandingPage() {
         </div>
 
         {/* Auth Buttons Top Right */}
-        <div className="flex items-center gap-4">
+        <div className={`flex items-center ${mobileShrink1 ? 'gap-2' : 'gap-4'}`}>
           {userName ? (
             <Link 
               href="/dashboard" 
-              className="text-sm font-medium bg-blue-600 hover:bg-blue-500 border border-transparent text-white px-5 py-2.5 rounded-full transition-all flex items-center gap-2"
+              className={`${mobileShrink1 ? 'text-[13px] px-3 py-1.5' : 'text-sm px-5 py-2.5'} font-medium bg-blue-600 hover:bg-blue-500 border border-transparent text-white rounded-full transition-all flex items-center gap-2`}
             >
               <span>Vào Dashboard</span>
             </Link>
@@ -84,13 +84,13 @@ export default function LandingPage() {
             <>
               <Link 
                 href="/login" 
-                className="text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+                className={`${mobileShrink1 ? 'text-[13px]' : 'text-sm'} font-medium text-zinc-300 hover:text-white transition-colors`}
               >
                 Đăng nhập
               </Link>
               <Link 
                 href="/register" 
-                className="text-sm font-medium bg-white/10 hover:bg-white/15 border border-white/10 text-white px-5 py-2.5 rounded-full transition-all"
+                className={`${mobileShrink1 ? 'text-[13px] px-3 py-1.5' : 'text-sm px-5 py-2.5'} font-medium bg-white/10 hover:bg-white/15 border border-white/10 text-white rounded-full transition-all`}
               >
                 Đăng ký
               </Link>
@@ -112,7 +112,7 @@ export default function LandingPage() {
 
         {/* Feature Highlights List */}
         <div className={`${mobileShrink1 ? 'mt-6 gap-3 flex flex-wrap justify-center px-4' : 'mt-10 gap-8 grid grid-cols-3'} w-full max-w-5xl`}>
-          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-3 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
+          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-1 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
             <div className={`${mobileShrink1 ? 'w-10 h-10 mb-2' : 'w-12 h-12 mb-4'} rounded-2xl bg-blue-500/10 flex items-center justify-center`}>
               <Zap className={`${mobileShrink1 ? 'w-5 h-5' : 'w-6 h-6'} text-blue-400`} />
             </div>
@@ -122,7 +122,7 @@ export default function LandingPage() {
             </div>
           </div>
           
-          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-3 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
+          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-1 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
             <div className={`${mobileShrink1 ? 'w-10 h-10 mb-2' : 'w-12 h-12 mb-4'} rounded-2xl bg-purple-500/10 flex items-center justify-center`}>
               <Mic className={`${mobileShrink1 ? 'w-5 h-5' : 'w-6 h-6'} text-purple-400`} />
             </div>
@@ -132,7 +132,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-3 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
+          <div className={`${mobileShrink1 ? 'w-[calc(50%-0.375rem)] p-1 aspect-square justify-center' : 'p-6'} rounded-3xl bg-zinc-900/50 border border-white/5 backdrop-blur-xl flex flex-col items-center text-center`}>
             <div className={`${mobileShrink1 ? 'w-10 h-10 mb-2' : 'w-12 h-12 mb-4'} rounded-2xl bg-emerald-500/10 flex items-center justify-center`}>
               <ShieldCheck className={`${mobileShrink1 ? 'w-5 h-5' : 'w-6 h-6'} text-emerald-400`} />
             </div>
