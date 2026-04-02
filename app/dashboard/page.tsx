@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import io, { Socket } from "socket.io-client";
 import DeviceCard from "@/components/DeviceCard";
 import VoiceControl from "@/components/VoiceControl";
-import { Lightbulb, UserRound, Settings, LogOut } from "lucide-react";
+import { Lightbulb, UserRound, Settings, LogOut, Sun, Moon } from "lucide-react";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
 // Assuming you have NextAuth session, we'd normally get devices from DB
@@ -27,6 +27,37 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("Người dùng");
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Dark/Light mode state
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  useEffect(() => {
+    // Check saved theme from Cookie
+    if (typeof window !== 'undefined') {
+      const savedTheme = Cookies.get('theme');
+      if (savedTheme === 'light') {
+        setIsDarkMode(false);
+        document.documentElement.classList.remove('dark');
+        // Optional: you can manually force styles if Tailwind 'darkMode: class' is not set
+      } else {
+        setIsDarkMode(true);
+        document.documentElement.classList.add('dark');
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+      Cookies.set('theme', 'dark', { expires: 365 }); // Lưu vào cookie 1 năm
+    } else {
+      document.documentElement.classList.remove('dark');
+      Cookies.set('theme', 'light', { expires: 365 }); // Lưu vào cookie 1 năm
+    }
+  };
 
   useEffect(() => {
     function checkDevice() {
@@ -201,22 +232,22 @@ export default function Dashboard() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#070709] text-zinc-100 flex flex-col ${mobileShrink1 ? 'p-3' : 'p-4 md:p-8'} font-sans pb-24 relative overflow-hidden`}>
+    <div className={`min-h-screen bg-white text-zinc-900 dark:bg-[#070709] dark:text-zinc-100 flex flex-col ${mobileShrink1 ? 'p-3' : 'p-4 md:p-8'} font-sans pb-24 relative overflow-hidden transition-colors duration-300`}>
       {/* Ambient background glows */}
-      <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[20%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none transition-opacity duration-300" />
+      <div className="absolute bottom-[20%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none transition-opacity duration-300" />
 
       <div className={`w-full max-w-5xl mx-auto relative z-10 ${mobileShrink1 ? 'space-y-4' : 'space-y-8'}`}>
         {/* Header section */}
         <div className={`flex justify-between items-center ${mobileShrink1 ? 'sm:mt-2' : 'sm:mt-4'}`}>
             <div>
               <h1 className={`${mobileShrink1 ? 'text-2xl' : 'text-3xl'} font-bold tracking-tight`}>Ngôi Nhà</h1>
-              <p className={`text-zinc-400 ${mobileShrink1 ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>Xin chào, {userName}</p>
+              <p className={`text-zinc-500 dark:text-zinc-400 ${mobileShrink1 ? 'text-xs mt-0.5' : 'text-sm mt-1'}`}>Xin chào, {userName}</p>
             </div>
             
             <div className={`flex items-center relative ${mobileShrink1 ? 'gap-2' : 'gap-4'}`}>
-              <div className={`flex items-center bg-zinc-800/40 rounded-full border border-white/5 backdrop-blur-md ${mobileShrink1 ? 'gap-2 pl-2 pr-3 py-1.5 text-xs' : 'gap-3 pl-3 pr-4 py-2 text-sm'}`}>
-                  <div className={`rounded-full ${mobileShrink1 ? 'w-2 h-2' : 'w-2.5 h-2.5'} ${isConnected ? "bg-emerald-400 shadow-[0_0_10px_#34d399]" : "bg-red-500 shadow-[0_0_10px_#ef4444]"}`}></div>
+              <div className={`flex items-center bg-zinc-200/50 dark:bg-zinc-800/40 rounded-full border border-black/5 dark:border-white/5 backdrop-blur-md ${mobileShrink1 ? 'gap-2 pl-2 pr-3 py-1.5 text-xs' : 'gap-3 pl-3 pr-4 py-2 text-sm'}`}>
+                  <div className={`rounded-full ${mobileShrink1 ? 'w-2 h-2' : 'w-2.5 h-2.5'} ${isConnected ? "bg-emerald-500 shadow-[0_0_10px_#34d399] dark:bg-emerald-400" : "bg-red-500 shadow-[0_0_10px_#ef4444]"}`}></div>
                   <span className="font-medium">{isConnected ? "Connected" : "Offline"}</span>
               </div>
               
@@ -224,35 +255,41 @@ export default function Dashboard() {
               <div className="relative" ref={menuRef}>
                 <button 
                   onClick={() => setIsAvatarMenuOpen(!isAvatarMenuOpen)}
-                  className={`rounded-full bg-zinc-800 border-2 border-white/10 flex items-center justify-center hover:border-blue-500/50 transition-colors focus:outline-none ${mobileShrink1 ? 'w-8 h-8' : 'w-10 h-10'}`}
+                  className={`rounded-full bg-zinc-100 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 flex items-center justify-center hover:border-blue-500/50 transition-colors focus:outline-none ${mobileShrink1 ? 'w-8 h-8' : 'w-10 h-10'}`}
                 >
-                  <UserRound className={`${mobileShrink1 ? 'w-4 h-4' : 'w-5 h-5'} text-zinc-300`} />
+                  <UserRound className={`${mobileShrink1 ? 'w-4 h-4' : 'w-5 h-5'} text-zinc-600 dark:text-zinc-300`} />
                 </button>
                 
                 {/* Fallback Menu Dropdown */}
                 {isAvatarMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-48 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="absolute right-0 mt-3 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
                     <button 
-                      onClick={() => setIsAvatarMenuOpen(false)}
-                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors"
+                      onClick={() => {
+                        setIsAvatarMenuOpen(false);
+                        router.push("/profile");
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-black dark:hover:text-white flex items-center gap-2 transition-colors"
                     >
                       <UserRound className="w-4 h-4" />
-                      Hồ sơ của tôi
+                      Hồ sơ
                     </button>
                     <button 
-                      onClick={() => setIsAvatarMenuOpen(false)}
-                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-white/5 hover:text-white flex items-center gap-2 transition-colors"
+                      onClick={() => {
+                        toggleTheme();
+                        setIsAvatarMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-black dark:hover:text-white flex items-center gap-2 transition-colors"
                     >
-                      <Settings className="w-4 h-4" />
-                      Cài đặt
+                      {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                      {isDarkMode ? 'Chế độ sáng' : 'Chế độ tối'}
                     </button>
-                    <div className="w-full h-px bg-white/5 my-1"></div>
+                    <div className="w-full h-px bg-zinc-200 dark:bg-white/5 my-1"></div>
                     <button 
                       onClick={() => {
                         setIsAvatarMenuOpen(false);
                         handleLogout();
                       }}
-                      className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors group"
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition-colors group"
                     >
                       <LogOut className="w-4 h-4 group-hover:pl-0.5 transition-all" />
                       Đăng xuất
@@ -270,7 +307,7 @@ export default function Dashboard() {
           <div className={`lg:col-span-8 ${mobileShrink1 ? 'space-y-4' : 'space-y-6'}`}>
              <div>
                 <div className={`flex items-center justify-between ${mobileShrink1 ? 'mb-2' : 'mb-4'}`}>
-                   <h2 className={`${mobileShrink1 ? 'text-lg' : 'text-xl'} font-semibold text-zinc-100`}>Thiết bị</h2>
+                   <h2 className={`${mobileShrink1 ? 'text-lg' : 'text-xl'} font-semibold text-zinc-900 dark:text-zinc-100`}>Thiết bị</h2>
                 </div>
                 <div className={`grid grid-cols-2 md:grid-cols-3 ${mobileShrink1 ? 'gap-2.5' : 'gap-4'}`}>
                    <DeviceCard id="light" name="Đèn ngoài sân" state={devices.light} type="light" onToggle={toggleDevice} mobileShrink1={mobileShrink1} />
@@ -289,12 +326,12 @@ export default function Dashboard() {
              </div>
 
              {/* AI Tips */}
-             <div className={`bg-zinc-800/40 backdrop-blur-xl border border-white/5 rounded-3xl ${mobileShrink1 ? 'p-4' : 'p-6'}`}>
+             <div className={`bg-white dark:bg-zinc-800/40 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-3xl shadow-sm dark:shadow-none ${mobileShrink1 ? 'p-4' : 'p-6'}`}>
                  <div className={`flex items-center gap-2 ${mobileShrink1 ? 'mb-2' : 'mb-3'}`}>
-                     <Lightbulb className={`${mobileShrink1 ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-amber-400`} />
-                     <span className={`${mobileShrink1 ? 'text-xs' : 'text-sm'} font-semibold text-zinc-100`}>Gợi ý lệnh</span>
+                     <Lightbulb className={`${mobileShrink1 ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-amber-500 dark:text-amber-400`} />
+                     <span className={`${mobileShrink1 ? 'text-xs' : 'text-sm'} font-semibold text-zinc-900 dark:text-zinc-100`}>Gợi ý lệnh</span>
                  </div>
-                 <div className={`${mobileShrink1 ? 'text-xs' : 'text-sm'} leading-relaxed text-zinc-400`}>
+                 <div className={`${mobileShrink1 ? 'text-xs' : 'text-sm'} leading-relaxed text-zinc-500 dark:text-zinc-400`}>
                      "sử dụng lệnh bật/tắt/mở/đóng [thiết bị]"
                  </div>
              </div>

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-border: hsl(var(--border) / <alpha-value>);
@@ -31,6 +32,12 @@
 }
 
 body {
+    background-color: #ffffff;
+    color: #111827;
+}
+
+.dark body {
     background-color: #050505;
+    color: #f3f4f6;
 }
 
