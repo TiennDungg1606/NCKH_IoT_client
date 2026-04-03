@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
   const [modalMessage, setModalMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false);
 
   useEffect(() => {
     // Responsive logic
@@ -111,6 +112,32 @@ export default function ProfilePage() {
       setConfirmPassword("");
       setModalMessage(null);
     }, 1500);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!userEmail) {
+      setModalMessage({ type: 'error', text: 'Không tìm thấy Email người dùng.' });
+      return;
+    }
+    setIsSendingResetEmail(true);
+    setModalMessage(null);
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Có lỗi xảy ra');
+      
+      setModalMessage({ type: 'success', text: data.message });
+    } catch (err: any) {
+      setModalMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsSendingResetEmail(false);
+    }
   };
 
   const handleLogout = () => {
@@ -283,7 +310,9 @@ export default function ProfilePage() {
 
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Mật khẩu cũ</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Mật khẩu cũ</label>
+                </div>
                 <input 
                   type="password" 
                   value={oldPassword}
@@ -292,6 +321,16 @@ export default function ProfilePage() {
                   placeholder="Nhập mật khẩu hiện tại"
                   required
                 />
+                  <div className="flex justify-end mt-2">
+                    <button 
+                      type="button" 
+                      onClick={handleForgotPassword}
+                      disabled={isSendingResetEmail}
+                      className="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {isSendingResetEmail ? 'Đang gửi...' : 'Quên mật khẩu?'}
+                    </button>
+                  </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Mật khẩu mới</label>

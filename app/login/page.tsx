@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { User, Lock, ArrowRight, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { User, Lock, ArrowRight, ArrowLeft, Eye, EyeOff, Mail, X } from "lucide-react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import Cookies from "js-cookie";
@@ -14,6 +14,12 @@ export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Forgot Password Modal States
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
 
   useEffect(() => {
     // Nếu cookie còn tồn tại, tức là đang đăng nhập hợp lệ => Chuyển thẳng tới dashboard
@@ -55,6 +61,30 @@ export default function LandingPage() {
     } catch (error) {
       setErrorMsg("Đã xảy ra lỗi, vui lòng thử lại.");
       setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    setForgotMessage(null);
+    
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Có lỗi xảy ra');
+      
+      setForgotMessage({ type: 'success', text: data.message });
+    } catch (err: any) {
+      setForgotMessage({ type: 'error', text: err.message });
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -125,6 +155,15 @@ export default function LandingPage() {
                   )}
                 </button>
               </div>
+              <div className="flex justify-end mt-2">
+                <button 
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-xs text-blue-500 hover:text-blue-400 font-medium transition-colors"
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
             </div>
 
             <button 
@@ -152,6 +191,61 @@ export default function LandingPage() {
             &copy; 2026 NCKH Smart Home Team
         </p>
       </div>
+
+      {/* Forgot Password Modal */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-zinc-900 border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => {
+                setIsForgotModalOpen(false);
+                setForgotMessage(null);
+                setForgotEmail("");
+              }}
+              className="absolute top-4 right-4 p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-zinc-400" />
+            </button>
+            
+            <div className="mb-6 flex items-center gap-3">
+              <div className="p-3 bg-blue-500/20 text-blue-400 rounded-2xl">
+                <Mail className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Khôi phục mật khẩu</h3>
+                <p className="text-sm text-zinc-400">Nhập email để nhận liên kết đặt lại</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <input 
+                  type="email" 
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="w-full bg-zinc-800/50 border border-white/10 focus:border-blue-500/50 text-white rounded-xl py-3 px-4 outline-none transition-colors"
+                  placeholder="Nhập email của bạn..."
+                  required
+                />
+              </div>
+
+              {forgotMessage && (
+                <div className={`p-3 rounded-lg text-sm font-medium text-center ${forgotMessage.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                  {forgotMessage.text}
+                </div>
+              )}
+
+              <button 
+                type="submit"
+                disabled={forgotLoading}
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex justify-center items-center"
+              >
+                {forgotLoading ? 'Đang gửi...' : 'Gửi liên kết'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
