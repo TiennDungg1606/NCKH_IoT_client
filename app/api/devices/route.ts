@@ -1,18 +1,20 @@
 ﻿import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
+import { cookies } from 'next/headers';
 import dbConnect from '@/lib/mongodb';
 import Device from '@/models/Device';
 import User from '@/models/User';
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession();
-    if (!session || !(session.user as any).id) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get('userId')?.value;
+    
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     await dbConnect();
-    const devices = await Device.find({ owner: (session.user as any).id });
+    const devices = await Device.find({ owner: userId });
 
     return NextResponse.json(devices);
   } catch (error) {
@@ -22,13 +24,16 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession();
-    if (!session || !(session.user as any).id) {
+    const body = await req.json();
+    let { mac, name, isMultiDevice, subIds, portNames, userId } = body;
+
+    const cookieStore = await cookies();
+    const cookieUserId = cookieStore.get('userId')?.value;
+    const finalUserId = userId || cookieUserId;
+
+    if (!finalUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const body = await req.json();
-    let { mac, name, isMultiDevice, subIds, portNames } = body;
 
     if (!mac) {
       return NextResponse.json({ error: 'Chưa nhập địa chỉ MAC' }, { status: 400 });
@@ -49,10 +54,10 @@ export async function POST(req: Request) {
       isMultiDevice: isMultiDevice !== undefined ? isMultiDevice : true,
       subIds: subIds || [],
       portNames: portNames || {},
-      owner: (session.user as any).id
+      owner: finalUserId
     });
 
-    await User.findByIdAndUpdate((session.user as any).id, {
+    await User.findByIdAndUpdate(finalUserId, {
       $addToSet: { device: mac }
     });
 

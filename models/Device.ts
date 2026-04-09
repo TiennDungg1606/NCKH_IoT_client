@@ -24,8 +24,7 @@ const DeviceSchema = new Schema({
     default: [],
   },
   portNames: {
-    type: Map,
-    of: String,
+    type: Object,
     default: {}
   }
 }, {

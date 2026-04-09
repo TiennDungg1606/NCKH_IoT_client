@@ -13,6 +13,7 @@
     "bcryptjs": "^3.0.3",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.3",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.7.0",
     "mongoose": "^9.3.3",
     "next": "^16.2.1",

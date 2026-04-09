@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import io, { Socket } from "socket.io-client";
+import jsQR from "jsqr";
 import DeviceCard from "@/components/DeviceCard";
 import VoiceControl from "@/components/VoiceControl";
 import { Lightbulb, UserRound, Settings, LogOut, Sun, Moon, Plus, QrCode, X, Cpu } from "lucide-react";
@@ -99,13 +100,67 @@ export default function Dashboard() {
   // --- MỞ RỘNG (SCALABILITY) ---
   const [customDevices, setCustomDevices] = useState<any[]>([]);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
+  const [newDeviceName, setNewDeviceName] = useState("");
   const [newPortNames, setNewPortNames] = useState<{[key: number]: string}>({});
   const [newDeviceMac, setNewDeviceMac] = useState("");
   const [isAddingDevice, setIsAddingDevice] = useState(false);
-  
+
   // States cho tiến trình mới
   const [verifyingStep, setVerifyingStep] = useState<'enter_mac' | 'enter_name'>('enter_mac');
   const [deviceVerificationInfo, setDeviceVerificationInfo] = useState<any>(null);
+  
+  const qrFileRef = useRef<HTMLInputElement>(null);
+
+  const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        
+        // Scale down image to avoid massive processing time while keeping readability
+        const maxSize = 800;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round(height * (maxSize / width));
+            width = maxSize;
+          } else {
+            width = Math.round(width * (maxSize / height));
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          
+          if (code) {
+            setNewDeviceMac(code.data.trim());
+          } else {
+            alert("Không tìm thấy mã QR trong ảnh này. Dữ liệu mờ hoặc không hợp lệ.");
+          }
+        }
+        
+        // Reset file input
+        if (qrFileRef.current) qrFileRef.current.value = "";
+      };
+      if (typeof event.target?.result === 'string') {
+        img.src = event.target.result;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const fetchRegisteredDevices = async () => {
@@ -131,6 +186,7 @@ export default function Dashboard() {
   const resetModal = () => {
     setIsAddDeviceModalOpen(false);
     setNewDeviceMac('');
+    setNewDeviceName('');
     setNewPortNames({});
     setVerifyingStep('enter_mac');
     setDeviceVerificationInfo(null);
@@ -177,10 +233,9 @@ export default function Dashboard() {
 
   const handleSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeviceMac || !deviceVerificationInfo) return;
+    if (!newDeviceName || !newDeviceMac || !deviceVerificationInfo) return;
 
     setIsAddingDevice(true);
-    const defaultName = 'Thiết bị ' + newDeviceMac.slice(-4);
     
     try {
       const res = await fetch('/api/devices', {
@@ -188,7 +243,7 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mac: newDeviceMac,
-          name: defaultName,
+          name: newDeviceName,
           isMultiDevice: deviceVerificationInfo.isMultiDevice,
           subIds: deviceVerificationInfo.subIds,
           portNames: newPortNames,
@@ -201,7 +256,7 @@ export default function Dashboard() {
 
       setCustomDevices(prev => [...prev, {
          _id: data._id || `custom_${Date.now()}`,
-         name: defaultName,
+         name: newDeviceName,
          deviceId: newDeviceMac,
          isMultiDevice: deviceVerificationInfo.isMultiDevice,
          subIds: deviceVerificationInfo.subIds,
@@ -394,43 +449,53 @@ export default function Dashboard() {
                      </div>
                    ) : (
                      customDevices.map(dev => (
-                       dev.isMultiDevice && dev.subIds && dev.subIds.length > 0 ? (
-                       dev.subIds.map((subId: number) => {
-                         const uniqueId = `${dev.deviceId}_${subId}`;
-                         return (
+                       <div className="contents" key={dev.deviceId || dev._id}>
+                         {/* Tiêu đề nhóm thiết bị */}
+                         <div className="col-span-full flex items-center gap-3 mt-4 mb-1">
+                           <h3 className="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{dev.name}</h3>
+                           <div className="h-px flex-1 bg-zinc-200 dark:bg-white/10"></div>
+                         </div>
+                         
+                         {/* Render các card con */}
+                         {dev.isMultiDevice && dev.subIds && dev.subIds.length > 0 ? (
+                           dev.subIds.map((subId: number) => {
+                             const uniqueId = `${dev.deviceId}_${subId}`;
+                             return (
+                               <DeviceCard 
+                                 key={uniqueId} 
+                                 id={uniqueId} 
+                                 name={dev.portNames?.[String(subId)] || dev.portNames?.[subId] || `${dev.name} (Cổng ${subId})`} 
+                                 state={dev.states?.[uniqueId] || false} 
+                                 type="light" 
+                                 onToggle={(id, currentState) => {
+                                   setCustomDevices(prev => prev.map(d => 
+                                     d.deviceId === dev.deviceId 
+                                       ? { ...d, states: { ...(d.states || {}), [uniqueId]: !currentState } } 
+                                       : d
+                                   ));
+                                   sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF', subId); 
+                                 }} 
+                                 mobileShrink1={mobileShrink1} 
+                               />
+                             );
+                           })
+                         ) : (
                            <DeviceCard 
-                             key={uniqueId} 
-                             id={uniqueId} 
-                             name={dev.portNames?.[String(subId)] || dev.portNames?.[subId] || `${dev.name} (Cổng ${subId})`} 
-                             state={dev.states?.[uniqueId] || false} 
-                             type="light" 
+                             key={dev.deviceId || dev._id} 
+                             id={dev.deviceId || dev._id} 
+                             name={dev.portNames?.[0] || dev.name} 
+                             state={dev.state || false} 
+                             type={dev.type || "light"} 
                              onToggle={(id, currentState) => {
-                               setCustomDevices(prev => prev.map(d => 
-                                 d.deviceId === dev.deviceId 
-                                   ? { ...d, states: { ...(d.states || {}), [uniqueId]: !currentState } } 
-                                   : d
-                               ));
-                               sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF', subId); 
+                               setCustomDevices(prev => prev.map(d => d.deviceId === dev.deviceId ? { ...d, state: !currentState } : d));
+                               sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF'); 
                              }} 
                              mobileShrink1={mobileShrink1} 
                            />
-                         );
-                       })
-                     ) : (
-                       <DeviceCard 
-                         key={dev.deviceId || dev._id} 
-                         id={dev.deviceId || dev._id} 
-                         name={dev.portNames?.[0] || dev.name} 
-                         state={dev.state || false} 
-                         type={dev.type || "light"} 
-                         onToggle={(id, currentState) => {
-                           setCustomDevices(prev => prev.map(d => d.deviceId === dev.deviceId ? { ...d, state: !currentState } : d));
-                           sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF'); 
-                         }} 
-                         mobileShrink1={mobileShrink1} 
-                       />
-                     )
-                   )))}
+                         )}
+                       </div>
+                     ))
+                   )}
                 </div>
              </div>
 
@@ -492,10 +557,17 @@ export default function Dashboard() {
                       placeholder="VD: D4:E9:F4:E9:53:DC"
                       required
                     />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={qrFileRef}
+                      onChange={handleQrUpload}
+                      className="hidden"
+                    />
                     <button 
                       type="button"
-                      title="Quét mã QR"
-                      onClick={() => alert("Tính năng Mở Camera Quét QR sẽ được tích hợp ở bước sau")}
+                      title="Quét mã QR từ ảnh"
+                      onClick={() => qrFileRef.current?.click()}
                       className="flex items-center justify-center gap-2 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl transition-colors font-medium border border-zinc-200 dark:border-white/5"
                     >
                       <QrCode className="w-5 h-5" />
@@ -532,9 +604,24 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên nhóm thiết bị</label>
+                  <input 
+                    type="text" 
+                    value={newDeviceName}
+                    onChange={(e) => setNewDeviceName(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
+                    placeholder="VD: Nhóm đèn vườn..."
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="w-full h-px bg-zinc-200 dark:bg-white/10 my-4"></div>
+
                 {deviceVerificationInfo?.isMultiDevice ? (
                   deviceVerificationInfo?.subIds?.map((subId: number, index: number) => (
-                    <div key={subId}>
+                    <div key={subId} className="mb-3">
                       <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị ở cổng {subId}</label>
                       <input 
                         type="text" 
@@ -542,21 +629,19 @@ export default function Dashboard() {
                         onChange={(e) => setNewPortNames(prev => ({ ...prev, [subId]: e.target.value }))}
                         className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
                         placeholder={`VD: Đèn cổng ${subId}`}
-                        autoFocus={index === 0}
                         required
                       />
                     </div>
                   ))
                 ) : (
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị</label>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị nhánh</label>
                     <input 
                       type="text" 
                       value={newPortNames[0] || ''}
                       onChange={(e) => setNewPortNames(prev => ({ ...prev, [0]: e.target.value }))}
                       className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
                       placeholder={`VD: Đèn phòng khách`}
-                      autoFocus
                       required
                     />
                   </div>
