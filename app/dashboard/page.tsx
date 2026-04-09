@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import io, { Socket } from "socket.io-client";
 import DeviceCard from "@/components/DeviceCard";
 import VoiceControl from "@/components/VoiceControl";
-import { Lightbulb, UserRound, Settings, LogOut, Sun, Moon } from "lucide-react";
+import { Lightbulb, UserRound, Settings, LogOut, Sun, Moon, Plus, QrCode, X, Cpu } from "lucide-react";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
 // Assuming you have NextAuth session, we'd normally get devices from DB
@@ -96,13 +96,127 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Dummy device states matching HTML
-  const [devices, setDevices] = useState({
-    light: false,
-    door: false,
-    auxLight: false,
-    fan: false
-  });
+  // --- MỞ RỘNG (SCALABILITY) ---
+  const [customDevices, setCustomDevices] = useState<any[]>([]);
+  const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
+  const [newDeviceName, setNewDeviceName] = useState("");
+  const [newDeviceMac, setNewDeviceMac] = useState("");
+  const [isAddingDevice, setIsAddingDevice] = useState(false);
+  
+  // States cho tiến trình mới
+  const [verifyingStep, setVerifyingStep] = useState<'enter_mac' | 'enter_name'>('enter_mac');
+  const [deviceVerificationInfo, setDeviceVerificationInfo] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchRegisteredDevices = async () => {
+      try {
+        const res = await fetch('/api/devices');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setCustomDevices(data.map(d => ({ ...d, states: {}, state: false })));
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi tải thiết bị:", err);
+      }
+    };
+    
+    // Fetch thiết bị đã lưu từ DB khi load Dashboard
+    if (Cookies.get("userName")) {
+      fetchRegisteredDevices();
+    }
+  }, []);
+
+  const resetModal = () => {
+    setIsAddDeviceModalOpen(false);
+    setNewDeviceMac('');
+    setNewDeviceName('');
+    setVerifyingStep('enter_mac');
+    setDeviceVerificationInfo(null);
+    setIsAddingDevice(false);
+  };
+  // -----------------------------
+
+  const handleVerifyMac = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeviceMac) return;
+
+    setIsAddingDevice(true);
+    setFeedbackText('Đang kết nối Server để xác thực thiết bị...');
+
+    try {
+      if (!socket) throw new Error('Cần kết nối Server trước.');
+
+      const deviceInfo: any = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          socket.off('device_info_result');
+          reject(new Error('Mất kết nối tới thiết bị (Timeout). Thiết bị có đang bật mạng không?'));
+        }, 15000);
+
+        socket.on('device_info_result', (data: any) => {
+          if (data.device_id === newDeviceMac) {
+            clearTimeout(timeout);
+            socket.off('device_info_result');
+            data.error ? reject(new Error(data.error)) : resolve(data);
+          }
+        });
+        socket.emit('get_device_info', { device_id: newDeviceMac });
+      });
+
+      // Nếu thành công, lưu thông tin lại và chuyển qua bước đặt tên
+      setDeviceVerificationInfo(deviceInfo);
+      setVerifyingStep('enter_name');
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra');
+    } finally {
+      setIsAddingDevice(false);
+      setFeedbackText('🎙️ Nhấn micro và nói lệnh (bật/tắt đèn...)');
+    }
+  };
+
+  const handleSaveDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeviceName || !newDeviceMac || !deviceVerificationInfo) return;
+
+    setIsAddingDevice(true);
+    try {
+      const res = await fetch('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mac: newDeviceMac,
+          name: newDeviceName,
+          isMultiDevice: deviceVerificationInfo.isMultiDevice,
+          subIds: deviceVerificationInfo.subIds,
+          userId: Cookies.get("userId")
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Có lỗi khi kết nối Server lưu thiết bị');
+
+      setCustomDevices(prev => [...prev, {
+         _id: data._id || `custom_${Date.now()}`,
+         name: newDeviceName,
+         deviceId: newDeviceMac,
+         isMultiDevice: deviceVerificationInfo.isMultiDevice,
+         subIds: deviceVerificationInfo.subIds,
+         type: 'light',
+         states: {},
+         state: false
+      }]);
+      
+      resetModal();
+      alert(`Đã thêm thành công!\nCác cổng điều khiển nhận được: ${deviceVerificationInfo.subIds.join(', ')}`);
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setIsAddingDevice(false);
+    }
+  };
+
+  const REAL_MAC_ADDRESS = "D4:E9:F4:E9:53:DC"; // Thay địa chỉ MAC thực tế của ESP32 vào đây
 
   useEffect(() => {
     // Lấy thông tin user từ cookie khi load trang
@@ -124,10 +238,23 @@ export default function Dashboard() {
     });
     setSocket(newSocket);
 
+    // Khi Web Client kết nối tới Web Server Backend, gửi yêu cầu lấy trạng thái của ESP32 ngay lập tức
     newSocket.on("connect", () => {
-      setIsConnected(true);
+      newSocket.emit("check_device_status", { device_id: REAL_MAC_ADDRESS });
     });
 
+    // Lắng nghe thông báo cập nhật kết nối từ ESP32 thông qua Server Backend
+    newSocket.on("device_status", (payload) => {
+      if (payload && payload.device_id === REAL_MAC_ADDRESS) {
+        if (payload.status === "online") {
+          setIsConnected(true);
+        } else if (payload.status === "offline") {
+          setIsConnected(false);
+        }
+      }
+    });
+
+    // Nếu Web Client mất mạng tới Backend Server, thì dĩ nhiên coi như mất kết nối tới ESP32 luôn
     newSocket.on("disconnect", () => {
       setIsConnected(false);
     });
@@ -135,80 +262,18 @@ export default function Dashboard() {
     return () => {
       newSocket.close();
     };
-  }, []);
+  }, [REAL_MAC_ADDRESS, router]);
 
-  const sendDeviceCommand = useCallback((deviceId: string, action: string) => {
+  const sendDeviceCommand = useCallback((deviceId: string, action: string, subId?: number) => {
     if (socket) {
       // Payload matching the requirements
-      socket.emit('send_command', { device_id: deviceId, action });
+      socket.emit('send_command', { device_id: deviceId, action, sub_id: subId });
     }
   }, [socket]);
 
-  const toggleDevice = useCallback((id: string, currentState: boolean) => {
-    const REAL_MAC_ADDRESS = "D4:E9:F4:E9:53:DC"; // Thay địa chỉ MAC thực tế của ESP32 vào đây
-    
-    if (id === 'light') {
-      const newState = !currentState;
-      setDevices(prev => ({ ...prev, light: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'L1_ON' : 'L1_OFF');
-    } else if (id === 'door') {
-      const newState = !currentState;
-      setDevices(prev => ({ ...prev, door: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'M1_ON' : 'M1_OFF');
-    } else if (id === 'auxLight') {
-      const newState = !currentState;
-      setDevices(prev => ({ ...prev, auxLight: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'L2_ON' : 'L2_OFF');
-    } else if (id === 'fan') {
-      const newState = !currentState;
-      setDevices(prev => ({ ...prev, fan: newState }));
-      sendDeviceCommand(REAL_MAC_ADDRESS, newState ? 'M2_ON' : 'M2_OFF');
-    }
-  }, [sendDeviceCommand, socket]);
-
   const handleVoiceCommand = (transcript: string) => {
     const cmd = transcript.toLowerCase().trim();
-    let response = "";
-
-    if (cmd.includes("bật tất cả") || cmd.includes("mở tất cả")) {
-      if (!devices.light) toggleDevice('light', false);
-      if (!devices.auxLight) toggleDevice('auxLight', false);
-      if (!devices.fan) toggleDevice('fan', false);
-      if (!devices.door) toggleDevice('door', false);
-      response = "Đã bật tất cả thiết bị";
-    } else if (cmd.includes("tắt tất cả")) {
-      if (devices.light) toggleDevice('light', true);
-      if (devices.auxLight) toggleDevice('auxLight', true);
-      if (devices.fan) toggleDevice('fan', true);
-      if (devices.door) toggleDevice('door', true); // Maybe close door too when turning off all
-      response = "Đã tắt tất cả thiết bị";
-    } else if (cmd.includes("bật đèn trong nhà") || cmd.includes("mở đèn trong nhà")) {
-      if (!devices.auxLight) toggleDevice('auxLight', false);
-      else response = "Đèn trong nhà đã bật sẵn rồi";
-    } else if (cmd.includes("tắt đèn trong nhà")) {
-      if (devices.auxLight) toggleDevice('auxLight', true);
-      else response = "Đèn trong nhà đã tắt";
-    } else if (cmd.includes("bật đèn ngoài sân") || cmd.includes("mở đèn ngoài sân") || cmd.includes("bật đèn ngoài sân")) {
-      if (!devices.light) toggleDevice('light', false);
-      else response = "Đèn ngoài sân đã bật sẵn rồi";
-    } else if (cmd.includes("tắt đèn ngoài sân")) {
-      if (devices.light) toggleDevice('light', true);
-      else response = "Đèn ngoài sân đã tắt";
-    } else if (cmd.includes("mở cửa") || cmd.includes("bật cửa")) {
-      if (!devices.door) toggleDevice('door', false);
-      else response = "Cửa đã mở sẵn";
-    } else if (cmd.includes("đóng cửa") || cmd.includes("tắt cửa")) {
-      if (devices.door) toggleDevice('door', true);
-      else response = "Cửa đã đóng";
-    } else if (cmd.includes("bật quạt") || cmd.includes("mở quạt")) {
-      if (!devices.fan) toggleDevice('fan', false);
-      else response = "Quạt đã bật sẵn";
-    } else if (cmd.includes("tắt quạt")) {
-      if (devices.fan) toggleDevice('fan', true);
-      else response = "Quạt đã tắt";
-    } else {
-      response = "Lệnh không hợp lệ. Hãy thử: bật đèn, tắt đèn, mở cửa, bật quạt...";
-    }
+    let response = "Lệnh giọng nói hiện chưa hỗ trợ thiết bị tuỳ chỉnh.";
 
     if (response) {
       setFeedbackText(`🤖 ${response}`);
@@ -308,12 +373,60 @@ export default function Dashboard() {
              <div>
                 <div className={`flex items-center justify-between ${mobileShrink1 ? 'mb-2' : 'mb-4'}`}>
                    <h2 className={`${mobileShrink1 ? 'text-lg' : 'text-xl'} font-semibold text-zinc-900 dark:text-zinc-100`}>Thiết bị</h2>
+                   <button 
+                     onClick={() => setIsAddDeviceModalOpen(true)}
+                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-full font-medium text-sm transition-colors"
+                   >
+                     <Plus className="w-4 h-4" />
+                     <span>Thêm thiết bị</span>
+                   </button>
                 </div>
                 <div className={`grid grid-cols-2 md:grid-cols-3 ${mobileShrink1 ? 'gap-2.5' : 'gap-4'}`}>
-                   <DeviceCard id="light" name="Đèn ngoài sân" state={devices.light} type="light" onToggle={toggleDevice} mobileShrink1={mobileShrink1} />
-                   <DeviceCard id="door" name="Cửa" state={devices.door} type="door" onToggle={toggleDevice} mobileShrink1={mobileShrink1} />
-                   <DeviceCard id="auxLight" name="Đèn trong nhà" state={devices.auxLight} type="light" onToggle={toggleDevice} mobileShrink1={mobileShrink1} />
-                   <DeviceCard id="fan" name="Quạt" state={devices.fan} type="fan" onToggle={toggleDevice} mobileShrink1={mobileShrink1} />
+                   
+                   {/* Render Dynamic Custom Devices */}
+                   {customDevices.length === 0 ? (
+                     <div className="col-span-full py-10 text-center text-zinc-500 dark:text-zinc-400 italic">
+                        Hiện chưa có thiết bị nào. 
+                     </div>
+                   ) : (
+                     customDevices.map(dev => (
+                       dev.isMultiDevice && dev.subIds && dev.subIds.length > 0 ? (
+                       dev.subIds.map((subId: number) => {
+                         const uniqueId = `${dev.deviceId}_${subId}`;
+                         return (
+                           <DeviceCard 
+                             key={uniqueId} 
+                             id={uniqueId} 
+                             name={`${dev.name} (Cổng ${subId})`} 
+                             state={dev.states?.[uniqueId] || false} 
+                             type="light" 
+                             onToggle={(id, currentState) => {
+                               setCustomDevices(prev => prev.map(d => 
+                                 d.deviceId === dev.deviceId 
+                                   ? { ...d, states: { ...(d.states || {}), [uniqueId]: !currentState } } 
+                                   : d
+                               ));
+                               sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF', subId); 
+                             }} 
+                             mobileShrink1={mobileShrink1} 
+                           />
+                         );
+                       })
+                     ) : (
+                       <DeviceCard 
+                         key={dev.deviceId || dev._id} 
+                         id={dev.deviceId || dev._id} 
+                         name={dev.name} 
+                         state={dev.state || false} 
+                         type={dev.type || "light"} 
+                         onToggle={(id, currentState) => {
+                           setCustomDevices(prev => prev.map(d => d.deviceId === dev.deviceId ? { ...d, state: !currentState } : d));
+                           sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF'); 
+                         }} 
+                         mobileShrink1={mobileShrink1} 
+                       />
+                     )
+                   )))}
                 </div>
              </div>
 
@@ -338,6 +451,119 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* --- ADD DEVICE MODAL --- */}
+      {isAddDeviceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={resetModal}
+              className="absolute top-4 right-4 p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+            </button>
+            
+            <div className="mb-6 flex items-center gap-3">
+              <div className="p-3 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-2xl">
+                <Cpu className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Thêm thiết bị mới</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {verifyingStep === 'enter_mac' ? 'Kết nối thiết bị & cảm biến mới' : 'Thiết lập tên cho thiết bị'}
+                </p>
+              </div>
+            </div>
+
+            {verifyingStep === 'enter_mac' ? (
+              <form onSubmit={handleVerifyMac} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Địa chỉ MAC (ESP32)</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={newDeviceMac}
+                      onChange={(e) => setNewDeviceMac(e.target.value)}
+                      className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
+                      placeholder="VD: D4:E9:F4:E9:53:DC"
+                      required
+                    />
+                    <button 
+                      type="button"
+                      title="Quét mã QR"
+                      onClick={() => alert("Tính năng Mở Camera Quét QR sẽ được tích hợp ở bước sau")}
+                      className="flex items-center justify-center gap-2 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl transition-colors font-medium border border-zinc-200 dark:border-white/5"
+                    >
+                      <QrCode className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="button"
+                    onClick={resetModal}
+                    className="flex-1 py-3 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium rounded-xl transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isAddingDevice || !newDeviceMac}
+                    className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/30 disabled:opacity-50 flex justify-center items-center gap-2"
+                  >
+                    {isAddingDevice ? 'Xác thực...' : 'Tiếp tục'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSaveDevice} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="p-4 bg-green-50 dark:bg-green-500/10 rounded-xl border border-green-200 dark:border-green-500/20 mb-4">
+                  <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                    Xác thực thành công!
+                  </p>
+                  <div className="text-xs text-green-700/80 dark:text-green-400/80 mt-1">
+                    Cấu hình: {deviceVerificationInfo?.isMultiDevice ? 'MẠCH ĐA THIẾT BỊ' : 'THIẾT BỊ ĐƠN'}<br/>
+                    {deviceVerificationInfo?.isMultiDevice && `Hỗ trợ ${deviceVerificationInfo?.subIds?.length} cổng điều khiển`}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị</label>
+                  <input 
+                    type="text" 
+                    value={newDeviceName}
+                    onChange={(e) => setNewDeviceName(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
+                    placeholder="VD: Nhóm đèn vườn..."
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setVerifyingStep('enter_mac')}
+                    className="flex-1 py-3 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium rounded-xl transition-colors"
+                  >
+                    Quay lại
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isAddingDevice || !newDeviceName}
+                    className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/30 disabled:opacity-50"
+                  >
+                    {isAddingDevice ? 'Đang lưu...' : 'Hoàn tất'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+      {/* --------------------------- */}
+
     </div>
   );
 }

@@ -168,9 +168,6 @@ export default function ResetPasswordPage() {
               <Lock className="w-8 h-8" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Tạo Mật khẩu mới</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">
-              Bạn đang được cấp lại quyền truy cập vào tài khoản với Token an toàn.
-            </p>
           </div>
 
           <Suspense fallback={<div className="text-center py-10 animate-pulse text-zinc-500">Đang quét liên kết từ hệ thống...</div>}>

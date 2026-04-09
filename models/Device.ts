@@ -14,6 +14,14 @@ const DeviceSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  isMultiDevice: {
+    type: Boolean,
+    default: true,
+  },
+  subIds: {
+    type: [Number],
+    default: [],
   }
 }, {
   timestamps: true,
