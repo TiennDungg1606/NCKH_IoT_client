@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    let { mac, name, isMultiDevice, subIds } = body;
+    let { mac, name, isMultiDevice, subIds, portNames } = body;
 
     if (!mac) {
       return NextResponse.json({ error: 'Chưa nhập địa chỉ MAC' }, { status: 400 });
@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       name,
       isMultiDevice: isMultiDevice !== undefined ? isMultiDevice : true,
       subIds: subIds || [],
+      portNames: portNames || {},
       owner: (session.user as any).id
     });
 

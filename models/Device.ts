@@ -22,6 +22,11 @@ const DeviceSchema = new Schema({
   subIds: {
     type: [Number],
     default: [],
+  },
+  portNames: {
+    type: Map,
+    of: String,
+    default: {}
   }
 }, {
   timestamps: true,

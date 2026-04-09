@@ -99,7 +99,7 @@ export default function Dashboard() {
   // --- MỞ RỘNG (SCALABILITY) ---
   const [customDevices, setCustomDevices] = useState<any[]>([]);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);
-  const [newDeviceName, setNewDeviceName] = useState("");
+  const [newPortNames, setNewPortNames] = useState<{[key: number]: string}>({});
   const [newDeviceMac, setNewDeviceMac] = useState("");
   const [isAddingDevice, setIsAddingDevice] = useState(false);
   
@@ -131,7 +131,7 @@ export default function Dashboard() {
   const resetModal = () => {
     setIsAddDeviceModalOpen(false);
     setNewDeviceMac('');
-    setNewDeviceName('');
+    setNewPortNames({});
     setVerifyingStep('enter_mac');
     setDeviceVerificationInfo(null);
     setIsAddingDevice(false);
@@ -177,18 +177,21 @@ export default function Dashboard() {
 
   const handleSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeviceName || !newDeviceMac || !deviceVerificationInfo) return;
+    if (!newDeviceMac || !deviceVerificationInfo) return;
 
     setIsAddingDevice(true);
+    const defaultName = 'Thiết bị ' + newDeviceMac.slice(-4);
+    
     try {
       const res = await fetch('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mac: newDeviceMac,
-          name: newDeviceName,
+          name: defaultName,
           isMultiDevice: deviceVerificationInfo.isMultiDevice,
           subIds: deviceVerificationInfo.subIds,
+          portNames: newPortNames,
           userId: Cookies.get("userId")
         })
       });
@@ -198,10 +201,11 @@ export default function Dashboard() {
 
       setCustomDevices(prev => [...prev, {
          _id: data._id || `custom_${Date.now()}`,
-         name: newDeviceName,
+         name: defaultName,
          deviceId: newDeviceMac,
          isMultiDevice: deviceVerificationInfo.isMultiDevice,
          subIds: deviceVerificationInfo.subIds,
+         portNames: newPortNames,
          type: 'light',
          states: {},
          state: false
@@ -397,7 +401,7 @@ export default function Dashboard() {
                            <DeviceCard 
                              key={uniqueId} 
                              id={uniqueId} 
-                             name={`${dev.name} (Cổng ${subId})`} 
+                             name={dev.portNames?.[String(subId)] || dev.portNames?.[subId] || `${dev.name} (Cổng ${subId})`} 
                              state={dev.states?.[uniqueId] || false} 
                              type="light" 
                              onToggle={(id, currentState) => {
@@ -416,7 +420,7 @@ export default function Dashboard() {
                        <DeviceCard 
                          key={dev.deviceId || dev._id} 
                          id={dev.deviceId || dev._id} 
-                         name={dev.name} 
+                         name={dev.portNames?.[0] || dev.name} 
                          state={dev.state || false} 
                          type={dev.type || "light"} 
                          onToggle={(id, currentState) => {
@@ -528,18 +532,35 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị</label>
-                  <input 
-                    type="text" 
-                    value={newDeviceName}
-                    onChange={(e) => setNewDeviceName(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
-                    placeholder="VD: Nhóm đèn vườn..."
-                    autoFocus
-                    required
-                  />
-                </div>
+                {deviceVerificationInfo?.isMultiDevice ? (
+                  deviceVerificationInfo?.subIds?.map((subId: number, index: number) => (
+                    <div key={subId}>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị ở cổng {subId}</label>
+                      <input 
+                        type="text" 
+                        value={newPortNames[subId] || ''}
+                        onChange={(e) => setNewPortNames(prev => ({ ...prev, [subId]: e.target.value }))}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
+                        placeholder={`VD: Đèn cổng ${subId}`}
+                        autoFocus={index === 0}
+                        required
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Tên thiết bị</label>
+                    <input 
+                      type="text" 
+                      value={newPortNames[0] || ''}
+                      onChange={(e) => setNewPortNames(prev => ({ ...prev, [0]: e.target.value }))}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none transition-colors"
+                      placeholder={`VD: Đèn phòng khách`}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-4">
                   <button 
@@ -551,7 +572,7 @@ export default function Dashboard() {
                   </button>
                   <button 
                     type="submit"
-                    disabled={isAddingDevice || !newDeviceName}
+                    disabled={isAddingDevice}
                     className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/30 disabled:opacity-50"
                   >
                     {isAddingDevice ? 'Đang lưu...' : 'Hoàn tất'}
