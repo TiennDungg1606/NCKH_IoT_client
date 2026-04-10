@@ -5,7 +5,7 @@ import io, { Socket } from "socket.io-client";
 import jsQR from "jsqr";
 import DeviceCard from "@/components/DeviceCard";
 import VoiceControl from "@/components/VoiceControl";
-import { Lightbulb, UserRound, Settings, LogOut, Sun, Moon, Plus, QrCode, X, Cpu } from "lucide-react";
+import { Lightbulb, UserRound, Settings, LogOut, Sun, Moon, Plus, QrCode, X, Cpu, CheckCircle2, AlarmClock } from "lucide-react";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
 // Assuming you have NextAuth session, we'd normally get devices from DB
@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 export default function Dashboard() {
   const router = useRouter();
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [deviceStatuses, setDeviceStatuses] = useState<{ [key: string]: boolean }>({});
   const [feedbackText, setFeedbackText] = useState("🎙️ Nhấn micro và nói lệnh (bật/tắt đèn...)");
 // Responsive states for mobile/desktop layout adjustments  
   const [isMobile, setIsMobile] = useState(false);
@@ -104,6 +104,28 @@ export default function Dashboard() {
   const [newPortNames, setNewPortNames] = useState<{[key: number]: string}>({});
   const [newDeviceMac, setNewDeviceMac] = useState("");
   const [isAddingDevice, setIsAddingDevice] = useState(false);
+
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  
+  // States cho Schedule Modal
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleModalView, setScheduleModalView] = useState<'list' | 'add' | 'custom'>('list');
+  const [newSchedule, setNewSchedule] = useState<{ subId: number; timeOn: string; timeOff: string; repeat: string; customDays: number[] }>({
+    subId: 0, timeOn: '', timeOff: '', repeat: 'Một lần', customDays: []
+  });
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+
+  const [selectedDevice, setSelectedDevice] = useState<any>(null);
+  const [editingPortNames, setEditingPortNames] = useState<{ [key: string]: string }>({});
+  const [isSavingDevice, setIsSavingDevice] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
 
   // States cho tiến trình mới
   const [verifyingStep, setVerifyingStep] = useState<'enter_mac' | 'enter_name'>('enter_mac');
@@ -231,6 +253,109 @@ export default function Dashboard() {
     }
   };
 
+  const handleAddSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDevice || !selectedDevice.deviceId) return;
+    if (!newSchedule.timeOn && !newSchedule.timeOff) {
+      showToast("Cần chọn ít nhất thời gian bật hoặc tắt!");
+      return;
+    }
+
+    setIsSavingSchedule(true);
+    try {
+      const scheduleId = Date.now().toString();
+      const currentSchedules = selectedDevice.schedules || [];
+      const updatedSchedules = [...currentSchedules, { ...newSchedule, id: scheduleId, active: true }];
+
+      const response = await fetch('/api/devices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: selectedDevice.deviceId,
+          schedules: updatedSchedules
+        })
+      });
+      
+      if (response.ok) {
+        const updatedDevice = await response.json();
+        setCustomDevices(prev => prev.map(d => 
+          d.deviceId === updatedDevice.deviceId ? { ...d, schedules: updatedDevice.schedules } : d
+        ));
+        setSelectedDevice(updatedDevice);
+        setScheduleModalView('list');
+        showToast("Thêm lịch hẹn thành công!");
+      } else {
+        const { error } = await response.json();
+        showToast("Lỗi: " + (error || "Unknown error"));
+      }
+    } catch (err: any) {
+      showToast("Lỗi khi thêm lịch: " + err.message);
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    if (!selectedDevice || !selectedDevice.deviceId) return;
+    try {
+      const updatedSchedules = selectedDevice.schedules.filter((s:any) => s.id !== scheduleId);
+      
+      const response = await fetch('/api/devices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: selectedDevice.deviceId,
+          schedules: updatedSchedules
+        })
+      });
+      
+      if (response.ok) {
+        const updatedDevice = await response.json();
+        setCustomDevices(prev => prev.map(d => 
+          d.deviceId === updatedDevice.deviceId ? { ...d, schedules: updatedDevice.schedules } : d
+        ));
+        setSelectedDevice(updatedDevice);
+        showToast("Đã xóa lịch hẹn!");
+      } else {
+        showToast("Lỗi khi xóa lịch!");
+      }
+    } catch (err: any) {
+      showToast("Lỗi: " + err.message);
+    }
+  };
+
+  const handleSaveDeviceSettings = async () => {
+    if (!selectedDevice || !selectedDevice.deviceId) return;
+    setIsSavingDevice(true);
+    try {
+      const response = await fetch('/api/devices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: selectedDevice.deviceId,
+          portNames: editingPortNames
+        })
+      });
+      
+      if (response.ok) {
+        const updatedDevice = await response.json();
+        setCustomDevices(prev => prev.map(d => 
+          d.deviceId === updatedDevice.deviceId ? { ...d, portNames: updatedDevice.portNames } : d
+        ));
+        setSelectedDevice(null);
+        setIsSettingsModalOpen(false);
+        showToast("Lưu thay đổi thành công!");
+      } else {
+        const { error } = await response.json();
+        showToast("Lỗi khi lưu cài đặt: " + (error || "Unknown error"));
+      }
+    } catch (err: any) {
+      showToast("Lỗi khi lưu cài đặt: " + err.message);
+    } finally {
+      setIsSavingDevice(false);
+    }
+  };
+
   const handleSaveDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeviceName || !newDeviceMac || !deviceVerificationInfo) return;
@@ -299,29 +424,40 @@ export default function Dashboard() {
 
     // Khi Web Client kết nối tới Web Server Backend, gửi yêu cầu lấy trạng thái của ESP32 ngay lập tức
     newSocket.on("connect", () => {
-      newSocket.emit("check_device_status", { device_id: REAL_MAC_ADDRESS });
+      // check_device_status will be emitted per device in another effect
     });
 
     // Lắng nghe thông báo cập nhật kết nối từ ESP32 thông qua Server Backend
     newSocket.on("device_status", (payload) => {
-      if (payload && payload.device_id === REAL_MAC_ADDRESS) {
-        if (payload.status === "online") {
-          setIsConnected(true);
-        } else if (payload.status === "offline") {
-          setIsConnected(false);
-        }
+      if (payload && payload.device_id) {
+        setDeviceStatuses((prev) => ({
+          ...prev,
+          [payload.device_id]: payload.status === "online"
+        }));
       }
     });
 
-    // Nếu Web Client mất mạng tới Backend Server, thì dĩ nhiên coi như mất kết nối tới ESP32 luôn
+    // Nếu Web Client mất mạng tới Backend Server, coi như mất kết nối tới tất cả
     newSocket.on("disconnect", () => {
-      setIsConnected(false);
+      setDeviceStatuses({});
     });
 
     return () => {
       newSocket.close();
     };
-  }, [REAL_MAC_ADDRESS, router]);
+  }, [router]);
+
+  useEffect(() => {
+    if (socket && socket.connected && customDevices.length > 0) {
+      customDevices.forEach(dev => {
+        socket.emit("check_device_status", { device_id: dev.deviceId });
+        
+        if (dev.schedules) {
+          socket.emit("update_schedules", { device_id: dev.deviceId, schedules: dev.schedules });
+        }
+      });
+    }
+  }, [socket, customDevices]);
 
   const sendDeviceCommand = useCallback((deviceId: string, action: string, subId?: number) => {
     if (socket) {
@@ -332,7 +468,126 @@ export default function Dashboard() {
 
   const handleVoiceCommand = (transcript: string) => {
     const cmd = transcript.toLowerCase().trim();
-    let response = "Lệnh giọng nói hiện chưa hỗ trợ thiết bị tuỳ chỉnh.";
+    let response = "";
+    let action = "";
+    let targetName = "";
+
+    // Parse the command and device name
+    if (cmd.startsWith("bật ") || cmd.startsWith("mở ")) {
+      action = "ON";
+      targetName = cmd.replace(/^(bật|mở)\s+/, "").trim();
+    } else if (cmd.startsWith("tắt ") || cmd.startsWith("đóng ")) {
+      action = "OFF";
+      targetName = cmd.replace(/^(tắt|đóng)\s+/, "").trim();
+    }
+
+    if (!action || !targetName) {
+      response = "Lệnh không hợp lệ. Vui lòng nói 'bật/tắt/mở/đóng [tên thiết bị]'.";
+    } else {
+      let found = false;
+      const newCustomDevices = [...customDevices];
+      let deviceUpdated = false;
+
+      // Unaccent function for better exact match comparison
+      const normalizeStr = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const normalizedTarget = normalizeStr(targetName);
+
+      if (normalizedTarget === "tat ca" || normalizedTarget === "tat ca thiet bi" || normalizedTarget === "tat ca may") {
+        for (let i = 0; i < newCustomDevices.length; i++) {
+          const dev = newCustomDevices[i];
+          if (dev.isMultiDevice && dev.subIds && dev.subIds.length > 0) {
+            for (let subId of dev.subIds) {
+              const uniqueId = `${dev.deviceId}_${subId}`;
+              newCustomDevices[i] = { 
+                ...newCustomDevices[i], 
+                states: { ...(newCustomDevices[i].states || {}), [uniqueId]: action === "ON" } 
+              };
+              sendDeviceCommand(dev.deviceId, action, subId);
+            }
+          } else {
+            newCustomDevices[i] = { ...newCustomDevices[i], state: action === "ON" };
+            sendDeviceCommand(dev.deviceId, action);
+          }
+        }
+        found = true;
+        deviceUpdated = true;
+        response = `Đã ${action === "ON" ? "bật" : "tắt"} tất cả các thiết bị.`;
+      } else if (normalizedTarget.startsWith("tat ca ")) {
+        // Tắt/bật tất cả một NHÓM thiết bị cụ thể (ví dụ: "tất cả đèn", "tất cả quạt")
+        const typeQuery = normalizedTarget.replace("tat ca ", "").trim();
+        let matchedCount = 0;
+
+        for (let i = 0; i < newCustomDevices.length; i++) {
+          const dev = newCustomDevices[i];
+          
+          // So sánh với "Loại thiết bị" (chính là trường name của device trong MongoDB)
+          if (dev.name && normalizeStr(dev.name).includes(typeQuery)) {
+            if (dev.isMultiDevice && dev.subIds && dev.subIds.length > 0) {
+              for (let subId of dev.subIds) {
+                const uniqueId = `${dev.deviceId}_${subId}`;
+                newCustomDevices[i] = { 
+                  ...newCustomDevices[i], 
+                  states: { ...(newCustomDevices[i].states || {}), [uniqueId]: action === "ON" } 
+                };
+                sendDeviceCommand(dev.deviceId, action, subId);
+                matchedCount++;
+              }
+              found = true;
+              deviceUpdated = true;
+            } else {
+              newCustomDevices[i] = { ...newCustomDevices[i], state: action === "ON" };
+              sendDeviceCommand(dev.deviceId, action);
+              found = true;
+              deviceUpdated = true;
+              matchedCount++;
+            }
+          }
+        }
+        if (found) {
+          // Bỏ chữ 'tất cả' ra cho câu phản hồi đẹp
+          const categoryName = targetName.replace(/^(tất cả|tat ca)\s+/i, "");
+          response = `Đã ${action === "ON" ? "bật" : "tắt"} ${matchedCount} thiết bị "${categoryName}".`;
+        }
+      } else {
+        for (let i = 0; i < newCustomDevices.length; i++) {
+          const dev = newCustomDevices[i];
+          
+          if (dev.isMultiDevice && dev.subIds && dev.subIds.length > 0) {
+            for (let subId of dev.subIds) {
+              const rawPortName = dev.portNames?.[String(subId)] || dev.portNames?.[subId] || `${dev.name} (Cổng ${subId})`;
+              if (normalizeStr(rawPortName) === normalizedTarget || rawPortName.toLowerCase() === targetName.toLowerCase()) {
+                const uniqueId = `${dev.deviceId}_${subId}`;
+                newCustomDevices[i] = { 
+                  ...dev, 
+                  states: { ...(dev.states || {}), [uniqueId]: action === "ON" } 
+                };
+                sendDeviceCommand(dev.deviceId, action, subId);
+                found = true;
+                deviceUpdated = true;
+                break;
+              }
+            }
+          } else {
+            const rawDeviceName = dev.portNames?.[0] || dev.name;
+            if (normalizeStr(rawDeviceName) === normalizedTarget || rawDeviceName.toLowerCase() === targetName.toLowerCase()) {
+              newCustomDevices[i] = { ...dev, state: action === "ON" };
+              sendDeviceCommand(dev.deviceId, action);
+              found = true;
+              deviceUpdated = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+      }
+
+      if (found) {
+        if (deviceUpdated) setCustomDevices(newCustomDevices);
+        // Leave response empty to signify success -> uses ✅
+      } else {
+        response = `Không tìm thấy thiết bị nào tên "${targetName}".`;
+      }
+    }
 
     if (response) {
       setFeedbackText(`🤖 ${response}`);
@@ -370,11 +625,6 @@ export default function Dashboard() {
             </div>
             
             <div className={`flex items-center relative ${mobileShrink1 ? 'gap-2' : 'gap-4'}`}>
-              <div className={`flex items-center bg-zinc-200/50 dark:bg-zinc-800/40 rounded-full border border-black/5 dark:border-white/5 backdrop-blur-md ${mobileShrink1 ? 'gap-2 pl-2 pr-3 py-1.5 text-xs' : 'gap-3 pl-3 pr-4 py-2 text-sm'}`}>
-                  <div className={`rounded-full ${mobileShrink1 ? 'w-2 h-2' : 'w-2.5 h-2.5'} ${isConnected ? "bg-emerald-500 shadow-[0_0_10px_#34d399] dark:bg-emerald-400" : "bg-red-500 shadow-[0_0_10px_#ef4444]"}`}></div>
-                  <span className="font-medium">{isConnected ? "Connected" : "Offline"}</span>
-              </div>
-              
               {/* User Avatar Menu */}
               <div className="relative" ref={menuRef}>
                 <button 
@@ -453,7 +703,38 @@ export default function Dashboard() {
                          {/* Tiêu đề nhóm thiết bị */}
                          <div className="col-span-full flex items-center gap-3 mt-4 mb-1">
                            <h3 className="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{dev.name}</h3>
+                           
+                           {/* Status Indicator */}
+                           <div className={`flex items-center bg-zinc-200/50 dark:bg-zinc-800/40 rounded-full border border-black/5 dark:border-white/5 backdrop-blur-md px-2 py-1 gap-1.5 text-[10px] ml-1`}>
+                               <div className={`rounded-full w-1.5 h-1.5 ${deviceStatuses[dev.deviceId] ? "bg-emerald-500 shadow-[0_0_8px_#34d399] dark:bg-emerald-400" : "bg-red-500 shadow-[0_0_8px_#ef4444]"}`}></div>
+                               <span className="font-medium text-zinc-600 dark:text-zinc-300">{deviceStatuses[dev.deviceId] ? "Online" : "Offline"}</span>
+                           </div>
+
                            <div className="h-px flex-1 bg-zinc-200 dark:bg-white/10"></div>
+                           <div className="flex gap-2">
+                             <button 
+                               onClick={() => {
+                                 setSelectedDevice(dev);
+                                 setIsScheduleModalOpen(true);
+                                 setScheduleModalView('list');
+                               }}
+                               className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                               title="Lên lịch hẹn"
+                             >
+                               <AlarmClock className="w-4 h-4" />
+                             </button>
+                             <button 
+                               onClick={() => {
+                                 setSelectedDevice(dev);
+                                 setEditingPortNames(dev.portNames || {});
+                                 setIsSettingsModalOpen(true);
+                               }}
+                               className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                               title="Cài đặt thiết bị"
+                             >
+                               <Settings className="w-4 h-4" />
+                             </button>
+                           </div>
                          </div>
                          
                          {/* Render các card con */}
@@ -467,6 +748,7 @@ export default function Dashboard() {
                                  name={dev.portNames?.[String(subId)] || dev.portNames?.[subId] || `${dev.name} (Cổng ${subId})`} 
                                  state={dev.states?.[uniqueId] || false} 
                                  type="light" 
+                                 portIndex={subId}
                                  onToggle={(id, currentState) => {
                                    setCustomDevices(prev => prev.map(d => 
                                      d.deviceId === dev.deviceId 
@@ -486,6 +768,7 @@ export default function Dashboard() {
                              name={dev.portNames?.[0] || dev.name} 
                              state={dev.state || false} 
                              type={dev.type || "light"} 
+                             portIndex={1}
                              onToggle={(id, currentState) => {
                                setCustomDevices(prev => prev.map(d => d.deviceId === dev.deviceId ? { ...d, state: !currentState } : d));
                                sendDeviceCommand(dev.deviceId, !currentState ? 'ON' : 'OFF'); 
@@ -508,7 +791,7 @@ export default function Dashboard() {
              </div>
 
              {/* AI Tips */}
-             <div className={`bg-white dark:bg-zinc-800/40 backdrop-blur-xl border border-black/5 dark:border-white/5 rounded-3xl shadow-sm dark:shadow-none ${mobileShrink1 ? 'p-4' : 'p-6'}`}>
+             <div className={`bg-white dark:bg-zinc-800/40 backdrop-blur-xl border bor    der-black/5 dark:border-white/5 rounded-3xl shadow-sm dark:shadow-none ${mobileShrink1 ? 'p-4' : 'p-6'}`}>
                  <div className={`flex items-center gap-2 ${mobileShrink1 ? 'mb-2' : 'mb-3'}`}>
                      <Lightbulb className={`${mobileShrink1 ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-amber-500 dark:text-amber-400`} />
                      <span className={`${mobileShrink1 ? 'text-xs' : 'text-sm'} font-semibold text-zinc-900 dark:text-zinc-100`}>Gợi ý lệnh</span>
@@ -520,6 +803,288 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* --- SCHEDULE MODAL --- */}
+      {isScheduleModalOpen && selectedDevice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+            
+            {scheduleModalView === 'list' && (
+              <>
+                <button 
+                  onClick={() => setIsScheduleModalOpen(false)}
+                  className="absolute top-4 right-4 p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+                </button>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-2xl">
+                      <AlarmClock className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Lên lịch hẹn</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {selectedDevice.name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 items-center justify-start mb-4">
+                  <button 
+                    onClick={() => {
+                      // Init default newSchedule
+                      let defSubId = selectedDevice.isMultiDevice && selectedDevice.subIds?.length > 0 ? selectedDevice.subIds[0] : 0;
+                      setNewSchedule({ subId: defSubId, timeOn: '', timeOff: '', repeat: 'Một lần', customDays: [] });
+                      setScheduleModalView('add');
+                    }}
+                    className="p-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-full transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Thêm lịch hẹn mới
+                  </span>
+                </div>  
+
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                  {(!selectedDevice.schedules || selectedDevice.schedules.length === 0) ? (
+                    <div className="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm italic bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-white/5">
+                      Chưa thiết lập lịch hẹn
+                    </div>
+                  ) : (
+                    selectedDevice.schedules.map((sched: any, idx: number) => {
+                      const portName = selectedDevice.isMultiDevice ? (selectedDevice.portNames?.[sched.subId] || `Cổng ${sched.subId}`) : (selectedDevice.portNames?.[0] || selectedDevice.name);
+                      return (
+                        <div key={sched.id || idx} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-white/10 flex justify-between items-center group">
+                          <div>
+                            <div className="font-semibold text-zinc-900 dark:text-white text-sm mb-1">{portName}</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400 space-y-1">
+                              {sched.timeOn && <div><span className="text-emerald-500 font-medium">Bật:</span> {sched.timeOn}</div>}
+                              {sched.timeOff && <div><span className="text-red-500 font-medium">Tắt:</span> {sched.timeOff}</div>}
+                              <div className="text-blue-500">Lặp: {sched.repeat}</div>
+                            </div>
+                          </div>
+                          <button onClick={() => handleDeleteSchedule(sched.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-colors">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </>
+            )}
+
+            {scheduleModalView === 'add' && (
+              <form onSubmit={handleAddSchedule} className="animate-in slide-in-from-right-4 fade-in duration-200">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Thêm lịch mới</h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Thiết lập hẹn giờ</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {selectedDevice.isMultiDevice && selectedDevice.subIds && selectedDevice.subIds.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Thiết bị nào</label>
+                      <select 
+                        value={newSchedule.subId}
+                        onChange={(e) => setNewSchedule({...newSchedule, subId: parseInt(e.target.value)})}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-colors appearance-none"
+                      >
+                        {selectedDevice.subIds.map((sid: number) => (
+                          <option key={sid} value={sid}>{selectedDevice.portNames?.[sid] || `Cổng ${sid}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Hẹn giờ bật</label>
+                      <input 
+                        type="time" 
+                        value={newSchedule.timeOn}
+                        onChange={(e) => setNewSchedule({...newSchedule, timeOn: e.target.value})}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Hẹn giờ tắt</label>
+                      <input 
+                        type="time" 
+                        value={newSchedule.timeOff}
+                        onChange={(e) => setNewSchedule({...newSchedule, timeOff: e.target.value})}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-red-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Lặp lại</label>
+                    <select 
+                      value={newSchedule.repeat}
+                      onChange={(e) => setNewSchedule({...newSchedule, repeat: e.target.value})}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-blue-500 transition-colors appearance-none"
+                    >
+                      <option value="Một lần">Một lần</option>
+                      <option value="Hàng ngày">Hàng ngày</option>
+                      <option value="Tùy chỉnh">Tùy chỉnh</option>
+                    </select>
+                  </div>
+                  
+                  {newSchedule.repeat === 'Tùy chỉnh' && (
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Chọn ngày</label>
+                      <div className="flex gap-2 justify-between">
+                        {[{label: 'T2', val: 1}, {label: 'T3', val: 2}, {label: 'T4', val: 3}, {label: 'T5', val: 4}, {label: 'T6', val: 5}, {label: 'T7', val: 6}, {label: 'CN', val: 0}].map(day => (
+                          <button
+                            key={day.val}
+                            type="button"
+                            onClick={() => {
+                              const hasDay = newSchedule.customDays.includes(day.val);
+                              setNewSchedule({
+                                ...newSchedule,
+                                customDays: hasDay 
+                                  ? newSchedule.customDays.filter(d => d !== day.val) 
+                                  : [...newSchedule.customDays, day.val]
+                              });
+                            }}
+                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-medium transition-colors ${
+                              newSchedule.customDays.includes(day.val) 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-6 mt-2 border-t border-zinc-200 dark:border-white/10">
+                  <button 
+                    type="button"
+                    onClick={() => setScheduleModalView('list')}
+                    className="flex-1 py-3 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium rounded-xl transition-colors"
+                  >
+                    Quay lại
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isSavingSchedule}
+                    className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/30 disabled:opacity-50"
+                  >
+                    {isSavingSchedule ? "Đang lưu..." : "Xác nhận"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* --- CÀI ĐẶT THIẾT BỊ MODAL --- */}
+      {isSettingsModalOpen && selectedDevice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => {
+                setIsSettingsModalOpen(false);
+                setSelectedDevice(null);
+              }}
+              className="absolute top-4 right-4 p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+            </button>
+            
+            <div className="mb-6 flex items-center gap-3">
+              <div className="p-3 bg-zinc-100 dark:bg-white/10 text-zinc-600 dark:text-zinc-400 rounded-2xl">
+                <Settings className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Cài đặt thiết bị</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {selectedDevice.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-white/10">
+                 <div className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Địa chỉ MAC</div>
+                 <div className="font-mono text-zinc-900 dark:text-zinc-100">{selectedDevice.deviceId}</div>
+                 
+                 <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-3 mb-1">Loại mạch</div>
+                 <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                   {selectedDevice.isMultiDevice ? `Đa thiết bị (${selectedDevice.subIds?.length} cổng)` : 'Thiết bị đơn'}
+                 </div>
+               </div>
+
+               {selectedDevice.isMultiDevice && selectedDevice.subIds && selectedDevice.subIds.length > 0 && (
+                 <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-white/10">
+                   <div className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3">Đổi tên cổng điều khiển</div>
+                   <div className="space-y-3">
+                     {selectedDevice.subIds.map((subId: number) => (
+                       <div key={subId} className="flex flex-col gap-1">
+                         <label className="text-xs text-zinc-500 dark:text-zinc-400">Cổng {subId}</label>
+                         <input 
+                           type="text"
+                           value={editingPortNames[String(subId)] || ''}
+                           onChange={(e) => setEditingPortNames({
+                             ...editingPortNames,
+                             [String(subId)]: e.target.value
+                           })}
+                           className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-lg py-2 px-3 text-sm outline-none transition-colors"
+                           placeholder={`Tên thiết bị (Cổng ${subId})`}
+                         />
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )}
+
+               {!selectedDevice.isMultiDevice && (
+                 <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-white/10">
+                   <div className="text-sm font-bold text-zinc-700 dark:text-zinc-300 mb-3">Đổi tên thiết bị</div>
+                   <input 
+                     type="text"
+                     value={editingPortNames['0'] || ''}
+                     onChange={(e) => setEditingPortNames({
+                       ...editingPortNames,
+                       ['0']: e.target.value
+                     })}
+                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 focus:border-blue-500 text-zinc-900 dark:text-white rounded-lg py-2 px-3 text-sm outline-none transition-colors"
+                     placeholder="Tên thiết bị..."
+                   />
+                 </div>
+               )}
+
+               <div className="pt-2 flex gap-3">
+                 <button 
+                   onClick={() => alert("Tính năng xóa thiết bị đang được phát triển")}
+                   className="flex-1 py-3 px-4 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 font-medium rounded-xl transition-colors"
+                 >
+                   Xóa thiết bị
+                 </button>
+                 <button 
+                   onClick={handleSaveDeviceSettings}
+                   disabled={isSavingDevice}
+                   className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50"
+                 >
+                   {isSavingDevice ? "Đang lưu..." : "Lưu thay đổi"}
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- ADD DEVICE MODAL --- */}
       {isAddDeviceModalOpen && (
@@ -669,6 +1234,14 @@ export default function Dashboard() {
         </div>
       )}
       {/* --------------------------- */}
+
+      {/* --- CUSTOM TOAST NOTIFICATION --- */}
+      {toastMessage && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3.5 rounded-2xl shadow-2xl shadow-black/20 dark:shadow-white/10 animate-in slide-in-from-top-5 fade-in duration-200">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 dark:text-emerald-500" />
+          <span className="font-medium text-sm">{toastMessage}</span>
+        </div>
+      )}
 
     </div>
   );

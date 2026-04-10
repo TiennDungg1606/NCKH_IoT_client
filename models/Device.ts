@@ -26,6 +26,18 @@ const DeviceSchema = new Schema({
   portNames: {
     type: Object,
     default: {}
+  },
+  schedules: {
+    type: [{
+      id: String,
+      subId: Number,
+      timeOn: String,
+      timeOff: String,
+      repeat: String,
+      customDays: [Number], // 0 (Sun) to 6 (Sat)
+      active: Boolean
+    }],
+    default: []
   }
 }, {
   timestamps: true,

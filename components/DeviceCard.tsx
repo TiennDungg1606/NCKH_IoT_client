@@ -10,12 +10,18 @@ interface DeviceCardProps {
   type: 'light' | 'door' | 'aux' | 'fan';
   onToggle: (id: string, currentState: boolean) => void;
   mobileShrink1?: boolean;
+  portIndex?: number;
 }
 
-const DeviceCard = memo(function DeviceCard({ id, name, state, type, onToggle, mobileShrink1 }: DeviceCardProps) {
-  
+const DeviceCard = memo(function DeviceCard({ id, name, state, type, onToggle, mobileShrink1, portIndex }: DeviceCardProps) {
+
   const getIcon = () => {
     const iconSize = mobileShrink1 ? "w-4 h-4" : "w-6 h-6";
+    const textClass = mobileShrink1 ? "text-sm font-bold" : "text-xl font-bold";
+    if (portIndex !== undefined) {
+      return <span className={textClass}>{portIndex}</span>;
+    }
+    
     switch (type) {
       case 'light':
         return <Lightbulb className={iconSize} />;
